@@ -8,6 +8,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../bridge.dart';
+import '../util/device_controls.dart';
 import '../util/format.dart';
 import '../util/fullscreen.dart';
 import 'playback_controller.dart';
@@ -53,6 +54,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
   set _fit(VideoFit v) => setState(() => _fitMode = v);
   double _pinchStart = 1;
 
+  // One-finger vertical swipes (touch): left half = brightness, right half = volume.
+  String? _swipeSide;
+  double _swipeValue = 0;
+  bool _swipeIsPinch = false;
+  final ValueNotifier<({bool brightness, double value})?> _level = ValueNotifier(null);
+  Timer? _levelTimer;
+  bool _brightnessChanged = false;
+
   bool get _touch => !isDesktop;
 
   @override
@@ -67,6 +76,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _hideTimer?.cancel();
     _seekFlashTimer?.cancel();
     _focus.dispose();
+    _levelTimer?.cancel();
+    _level.dispose();
+    // Brightness was only changed for this screen: hand it back to the system.
+    if (_brightnessChanged) DeviceControls.setBrightness(null).catchError((_) {});
     if (!_closing) FullscreenHelper.exitPlayer();
     // Final progress is reported inside c.dispose(); then tell the page.
     _ready.then((_) async {
@@ -102,6 +115,115 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _closing = true;
     await FullscreenHelper.exitPlayer();
     if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _onScaleStart(ScaleStartDetails d) async {
+    _pinchStart = 1;
+    _swipeIsPinch = d.pointerCount > 1;
+    _swipeSide = null;
+    final size = MediaQuery.sizeOf(context);
+    final y = d.localFocalPoint.dy;
+    // Leave the screen edges to the system gestures (status/navigation bars).
+    if (_swipeIsPinch || !DeviceControls.supported || y < size.height * 0.08 || y > size.height * 0.92) return;
+    final side = d.localFocalPoint.dx < size.width / 2 ? 'brightness' : 'volume';
+    try {
+      _swipeValue = side == 'brightness' ? await DeviceControls.brightness() : await DeviceControls.volume();
+      _swipeSide = side;
+    } catch (e) {
+      debugPrint('swipe $side unavailable: $e');
+    }
+  }
+
+  void _onScaleUpdate(ScaleUpdateDetails d) {
+    if (d.pointerCount > 1 || _swipeIsPinch) {
+      _swipeIsPinch = true;
+      _pinchStart = d.scale;
+      return;
+    }
+    final side = _swipeSide;
+    if (side == null || d.focalPointDelta.dy.abs() < d.focalPointDelta.dx.abs()) return;
+    // A swipe over ~70% of the screen height covers the whole range.
+    _swipeValue = (_swipeValue - d.focalPointDelta.dy / (MediaQuery.sizeOf(context).height * 0.7)).clamp(0.0, 1.0);
+    final brightness = side == 'brightness';
+    if (brightness) {
+      _brightnessChanged = true;
+      DeviceControls.setBrightness(_swipeValue).catchError((_) {});
+    } else {
+      DeviceControls.setVolume(_swipeValue).catchError((_) {});
+    }
+    _level.value = (brightness: brightness, value: _swipeValue);
+    _levelTimer?.cancel();
+    _levelTimer = Timer(const Duration(milliseconds: 900), () => _level.value = null);
+  }
+
+  void _onScaleEnd(ScaleEndDetails d) {
+    if (_swipeIsPinch) {
+      if (_pinchStart > 1.15 && _fit != VideoFit.cover) {
+        _fit = VideoFit.cover;
+        c.say(VideoFit.cover.label);
+      } else if (_pinchStart < 0.87 && _fit != VideoFit.contain) {
+        _fit = VideoFit.contain;
+        c.say(VideoFit.contain.label);
+      }
+    }
+    _swipeIsPinch = false;
+    _swipeSide = null;
+  }
+
+  /// Vertical level bar shown while swiping, like Fladder's indicators.
+  Widget _levelIndicator() {
+    return ValueListenableBuilder<({bool brightness, double value})?>(
+      valueListenable: _level,
+      builder: (context, level, _) {
+        final scheme = Theme.of(context).colorScheme;
+        return IgnorePointer(
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 150),
+            opacity: level == null ? 0 : 1,
+            child: level == null
+                ? const SizedBox.shrink()
+                : Align(
+                    alignment: level.brightness ? const Alignment(-0.8, 0) : const Alignment(0.8, 0),
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              level.brightness
+                                  ? IconsaxPlusBold.sun_1
+                                  : level.value == 0
+                                  ? IconsaxPlusBold.volume_cross
+                                  : IconsaxPlusBold.volume_high,
+                              size: 22,
+                            ),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              height: 140,
+                              width: 8,
+                              child: RotatedBox(
+                                quarterTurns: 3,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: LinearProgressIndicator(
+                                    value: level.value,
+                                    backgroundColor: scheme.onSurface.withValues(alpha: 0.2),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text('${(level.value * 100).round()}', style: Theme.of(context).textTheme.labelLarge),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _pickFit() async {
@@ -258,6 +380,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             ),
           ),
           _seekIndicator(),
+          if (_touch) _levelIndicator(),
           ValueListenableBuilder<String?>(
             valueListenable: c.notice,
             builder: (context, message, _) => IgnorePointer(
@@ -307,18 +430,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
           }
         },
         onDoubleTap: () {},
-        // Pinch out: fill the screen (crop); pinch in: back to fit.
-        onScaleStart: (_) => _pinchStart = 1,
-        onScaleUpdate: (d) => _pinchStart = d.scale,
-        onScaleEnd: (_) {
-          if (_pinchStart > 1.15 && _fit != VideoFit.cover) {
-            _fit = VideoFit.cover;
-            c.say(VideoFit.cover.label);
-          } else if (_pinchStart < 0.87 && _fit != VideoFit.contain) {
-            _fit = VideoFit.contain;
-            c.say(VideoFit.contain.label);
-          }
-        },
+        // One recognizer for both: Flutter does not combine drag and scale.
+        // Two fingers pinch (fill/fit), one finger swiping vertically sets
+        // brightness (left half) or volume (right half).
+        onScaleStart: _onScaleStart,
+        onScaleUpdate: _onScaleUpdate,
+        onScaleEnd: _onScaleEnd,
       );
     }
     return GestureDetector(

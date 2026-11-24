@@ -22,7 +22,7 @@ await window.webviewAll.callHandler('torboxStrm', {
 })  // → {ok: true} | {ok: false, error}
 ```
 
-Phụ đề: khi mở mỗi file, app gửi `{type:'subs', key}`; trang gọi `/api/subs` rồi trả `torboxStrm({type:'subs', key, list, auto, prefer})` và nội dung `torboxStrm({type:'subText', key, id, lang, label, format, text})` (lấy qua `/api/subs/get` bằng phiên của trang). App chọn phụ đề server bằng `{type:'subGet', key, id, lang}`, tắt bằng `{type:'subOff', key}`. `auto` theo đúng logic của ArtPlayer (đã chọn → tải lên → điểm ≥ 2); `prefer` là phụ đề addon đúng ngôn ngữ ưu tiên, app chỉ bật khi file không có phụ đề nhúng ngôn ngữ đó.
+Phụ đề: khi mở mỗi file, app gửi `{type:'subs', key}`; trang gọi `/api/subs` rồi trả `torboxStrm({type:'subs', key, list, auto, prefer})` và nội dung `torboxStrm({type:'subText', key, id, lang, label, format, text})` (lấy qua `/api/subs/get` bằng phiên của trang). App chọn phụ đề server bằng `{type:'subGet', key, id, lang, label}`, tắt bằng `{type:'subOff', key}`. Tìm online: app gửi `{type:'subSearch', key, langs}`, trang gọi `/api/subs/search` và trả `torboxStrm({type:'subSearch', key, results:[{id,lang,label,src,match,downloads,blocked}], note, langs})`. `auto` theo đúng logic của ArtPlayer (đã chọn → tải lên → điểm ≥ 2); `prefer` là phụ đề addon đúng ngôn ngữ ưu tiên, app chỉ bật khi file không có phụ đề nhúng ngôn ngữ đó.
 
 App → web: `window.TorBoxStrmBridge.event({type:'progress', key, pos, dur})` mỗi 15 giây, khi tạm dừng và khi đóng; `{type:'closed', key}` khi rời player. Trang tự gọi `/api/progress` bằng phiên đăng nhập của nó.
 
@@ -53,6 +53,10 @@ Chưa kiểm thử: Windows và Android trên máy thật, âm thanh (VPS không
    - Nên báo lỗi này lên `DonutWare/media-kit`.
 4. **Phụ đề nhúng không hiện ngay khi đổi track giữa chừng.** mpv chỉ hiện sự kiện được đọc sau thời điểm đổi. App tua tại chỗ một lần sau khi đổi track nhúng.
 
+## Cử chỉ (cảm ứng)
+
+Chạm: hiện/ẩn điều khiển. Chạm đúp trái/phải: ±10 giây, giữa: phát/dừng. Vuốt dọc nửa trái: độ sáng (chỉ cửa sổ app, trả lại khi thoát player); nửa phải: âm lượng media. Hai ngón: chụm để Lấp đầy / Vừa màn hình. Âm lượng và độ sáng dùng code Android riêng trong `MainActivity.kt` (kênh `torboxstrm/intent`), không dùng plugin: `volume_controller` làm sập app trên Linux không có thiết bị âm thanh. Chưa kiểm thử trên máy thật.
+
 ## Làm sau
 
 Từ bản rà soát mô tả bàn giao ban đầu:
@@ -69,7 +73,7 @@ Thêm:
 7. Kiểm thử theo thiết bị (máy/GPU/màn hình): H.264 SDR, HEVC Main10/HDR10, MKV nhiều audio/phụ đề, AV1, HLG, Dolby Vision, ASS/PGS. Phân biệt "giải mã được" với "xuất đúng HDR".
 8. Nút ▶ trên web bị trùng: nút tròn ▶ và "▶ Phát" đều mở player trong app.
 9. **Desktop chỉ nên chạy một instance.** Mở app lần hai trên Linux thì WebView trắng ("named profile is in use by another process"); Windows có thể tương tự. Linux: bỏ `G_APPLICATION_NON_UNIQUE` và cho `activate` đưa cửa sổ cũ lên; Windows: mutex + chuyển tiếp sang cửa sổ đang chạy. Làm cùng phần deep link.
-10. Tìm phụ đề online (OpenSubtitles/SubDL…) trong player như mục "Tìm phụ đề" của ArtPlayer; hiện chỉ chọn được phụ đề server đã có (addon, tải lên, đã chọn trước).
+10. ~~Tìm phụ đề online trong player~~: đã có (chip "Tìm online" trong bảng Phụ đề, server ≥ 1.7.0-dev.7).
 11. **Linux: menu nổi bị WebView che.** WebKitGTK vẽ đè lên lớp Flutter (menu "⋯", hộp thoại cập nhật hiện sau WebView nhưng có thể bị che một phần). Cân nhắc ẩn WebView (Offstage) khi mở menu/hộp thoại, hoặc dùng route riêng.
 12. **Windows chưa được kiểm thử trên máy thật.** Bản 0.4.3 đặt thư mục dữ liệu WebView2 trong `%LOCALAPPDATA%\TorBoxSTRM\WebView2`, báo lỗi rõ khi thiếu WebView2 Runtime và ghi log từng bước vào `%LOCALAPPDATA%\TorBoxSTRM\torbox-strm.log`. Nếu vẫn không tải được trang đăng nhập, đọc log đó.
 13. **4K hiển thị nhỏ** (báo từ máy thật, chưa tái hiện): đã thêm chế độ khung hình (Vừa/Lấp đầy/Kéo giãn/16:9/21:9/4:3, chụm ngón trên cảm ứng). Nếu khung hình vẫn nhỏ ở chế độ "Vừa màn hình", cần ảnh chụp + hộp "Thông tin phát" để kiểm tra texture của media_kit trên thiết bị đó.

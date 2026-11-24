@@ -106,6 +106,12 @@ class PlaybackController {
   final Set<String> _serverTitles = {};
   String? _serverTitle;
 
+  /// Online subtitle search (OpenSubtitles, SubDL…) for the current file.
+  final ValueNotifier<SubtitleSearchState> search = ValueNotifier(const SubtitleSearchState());
+
+  /// Subtitle languages configured on the server, used as search defaults.
+  List<String> subtitleLanguages = const ['vi', 'en'];
+
   /// Shown briefly by the UI ("Đã bật phụ đề …").
   final ValueNotifier<String?> notice = ValueNotifier(null);
 
@@ -191,6 +197,7 @@ class PlaybackController {
     // track in mpv, so the server subtitle state starts over each time.
     serverSubtitles.value = const [];
     serverSubtitleId.value = null;
+    if (search.value.key != item.key) search.value = const SubtitleSearchState();
     _serverTitle = null;
     _serverTitles.clear();
     await player.open(Media(item.url.toString(), start: start > Duration.zero ? start : null));
@@ -295,8 +302,17 @@ class PlaybackController {
     if (message is SubtitleList) {
       if (message.key != current.key) return;
       serverSubtitles.value = message.list;
+      if (message.languages.isNotEmpty) subtitleLanguages = message.languages;
       final prefer = message.byId(message.preferId);
       if (message.autoId == null && prefer != null) _maybeUsePreferred(prefer);
+    } else if (message is SubtitleSearch) {
+      if (message.key != current.key) return;
+      search.value = SubtitleSearchState(
+        key: message.key,
+        results: message.results,
+        note: message.note,
+        languages: message.languages,
+      );
     } else if (message is SubtitleText) {
       if (message.key != current.key) return;
       _loadServerSubtitle(message);
@@ -366,12 +382,39 @@ class PlaybackController {
 
   bool isServerTrack(String id) => _serverTitles.contains(_trackById(id)?.title);
 
+  /// Searches online providers through the page (`/api/subs/search`).
+  Future<void> searchOnline(String languages) async {
+    final link = page;
+    if (link == null) return;
+    final key = current.key;
+    search.value = SubtitleSearchState(key: key, loading: true, languages: languages);
+    await link.send({'type': 'subSearch', 'key': key, 'langs': languages});
+    // Providers can be slow; never leave the sheet spinning forever.
+    Timer(const Duration(seconds: 40), () {
+      if (_disposed) return;
+      final now = search.value;
+      if (now.loading && now.key == key) {
+        search.value = SubtitleSearchState(
+          key: key,
+          note: 'Không nhận được kết quả, thử lại sau.',
+          languages: languages,
+        );
+      }
+    });
+  }
+
   /// Picks a server subtitle (the page fetches it and sends it back).
   Future<void> selectServerSubtitle(ServerSubtitle sub) async {
     final link = page;
     if (link == null) return;
     _say('Đang tải phụ đề…');
-    await link.send({'type': 'subGet', 'key': current.key, 'id': sub.id, 'lang': sub.language ?? ''});
+    await link.send({
+      'type': 'subGet',
+      'key': current.key,
+      'id': sub.id,
+      'lang': sub.language ?? '',
+      'label': sub.label,
+    });
   }
 
   /// Embedded track chosen or subtitles turned off: forget the server one.
@@ -423,6 +466,7 @@ class PlaybackController {
     error.dispose();
     recovering.dispose();
     serverSubtitles.dispose();
+    search.dispose();
     serverSubtitleId.dispose();
     notice.dispose();
   }
@@ -442,4 +486,21 @@ class ActiveTracks {
   AudioTrack? audioOf(Tracks t) => _real(audio) ? t.audio.where((x) => x.id == audio).firstOrNull : null;
   SubtitleTrack? subtitleOf(Tracks t) => _real(subtitle) ? t.subtitle.where((x) => x.id == subtitle).firstOrNull : null;
   VideoTrack? videoOf(Tracks t) => _real(video) ? t.video.where((x) => x.id == video).firstOrNull : null;
+}
+
+class SubtitleSearchState {
+  const SubtitleSearchState({
+    this.key,
+    this.loading = false,
+    this.results = const [],
+    this.note = '',
+    this.languages = '',
+  });
+  final String? key;
+  final bool loading;
+  final List<ServerSubtitle> results;
+  final String note;
+  final String languages;
+
+  bool get done => key != null && !loading;
 }

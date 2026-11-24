@@ -119,16 +119,75 @@ class PlayRequest {
 /// One subtitle the server offers for a file (`/api/subs`: uploads, addon
 /// subtitles such as AIOStreams, a previously chosen online subtitle).
 class ServerSubtitle {
-  const ServerSubtitle({required this.id, required this.label, this.language, this.source});
+  const ServerSubtitle({
+    required this.id,
+    required this.label,
+    this.language,
+    this.source,
+    this.exactMatch = false,
+    this.downloads,
+    this.blocked = false,
+  });
   final String id;
   final String label;
   final String? language;
   final String? source;
+
+  /// Online search only: matches this exact release (moviehash), download
+  /// count, and whether the provider is out of quota right now.
+  final bool exactMatch;
+  final int? downloads;
+  final bool blocked;
+
+  static ServerSubtitle? parse(Object? e) {
+    if (e is! Map) return null;
+    final id = e['id'];
+    if (id is! String || id.isEmpty || id.length > 300) return null;
+    final label = e['label'];
+    final lang = e['lang'];
+    final src = e['src'];
+    final downloads = e['downloads'];
+    return ServerSubtitle(
+      id: id,
+      label: label is String && label.isNotEmpty ? _clip(label, 90) : id,
+      language: lang is String && lang.isNotEmpty ? _clip(lang, 16) : null,
+      source: src is String && src.isNotEmpty ? _clip(src, 32) : null,
+      exactMatch: e['match'] == true,
+      downloads: downloads is num ? downloads.toInt() : null,
+      blocked: e['blocked'] == true,
+    );
+  }
+}
+
+/// `{type:'subSearch', v:1, key, results, note, langs}`: online search results.
+class SubtitleSearch {
+  const SubtitleSearch({required this.key, required this.results, this.note = '', this.languages = ''});
+  final String key;
+  final List<ServerSubtitle> results;
+  final String note;
+  final String languages;
+
+  static SubtitleSearch parse(Map raw) {
+    final key = raw['key'];
+    if (!isValidKey(key)) throw const FormatException('Khoá file không hợp lệ');
+    final results = raw['results'];
+    final note = raw['note'];
+    final langs = raw['langs'];
+    return SubtitleSearch(
+      key: key as String,
+      results: [if (results is List) ...results.take(150).map(ServerSubtitle.parse).nonNulls],
+      note: note is String ? _clip(note, 300) : '',
+      languages: langs is String ? _clip(langs, 60) : '',
+    );
+  }
 }
 
 /// `{type:'subs', v:1, key, list:[{id,lang,label,src}], auto}` from the page.
 class SubtitleList {
-  const SubtitleList({required this.key, required this.list, this.autoId, this.preferId});
+  const SubtitleList({required this.key, required this.list, this.autoId, this.preferId, this.languages = const []});
+
+  /// Subtitle languages configured on the server (search defaults), e.g. vi, en.
+  final List<String> languages;
   final String key;
   final List<ServerSubtitle> list;
 
@@ -144,26 +203,9 @@ class SubtitleList {
   static SubtitleList parse(Map raw) {
     final key = raw['key'];
     if (!isValidKey(key)) throw const FormatException('Khoá file không hợp lệ');
-    final list = <ServerSubtitle>[];
     final rawList = raw['list'];
-    if (rawList is List) {
-      for (final e in rawList.take(200)) {
-        if (e is! Map) continue;
-        final id = e['id'];
-        if (id is! String || id.isEmpty || id.length > 300) continue;
-        final label = e['label'];
-        final lang = e['lang'];
-        final src = e['src'];
-        list.add(
-          ServerSubtitle(
-            id: id,
-            label: label is String && label.isNotEmpty ? _clip(label, 80) : id,
-            language: lang is String && lang.isNotEmpty ? _clip(lang, 16) : null,
-            source: src is String && src.isNotEmpty ? _clip(src, 32) : null,
-          ),
-        );
-      }
-    }
+    final list = [if (rawList is List) ...rawList.take(200).map(ServerSubtitle.parse).nonNulls];
+    final langs = raw['langs'];
     final auto = raw['auto'];
     final prefer = raw['prefer'];
     return SubtitleList(
@@ -171,6 +213,11 @@ class SubtitleList {
       list: list,
       autoId: auto is String && auto.isNotEmpty ? auto : null,
       preferId: prefer is String && prefer.isNotEmpty ? prefer : null,
+      languages: [
+        if (langs is List)
+          for (final l in langs.take(20))
+            if (l is String && l.isNotEmpty && l.length <= 8) l,
+      ],
     );
   }
 }

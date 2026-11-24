@@ -46,7 +46,6 @@ dependencies:
   webview_all_windows: ^1.5.2
   package_info_plus: ^10.2.2
   path_provider: ^2.1.6
-
 dev_dependencies:
   flutter_test:
     sdk: flutter

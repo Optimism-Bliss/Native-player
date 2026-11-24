@@ -188,6 +188,9 @@ class _BrowserScreenState extends State<BrowserScreen> {
         case 'subText':
           _toPlayer.add(SubtitleText.parse(raw as Map));
           return {'ok': true};
+        case 'subSearch':
+          _toPlayer.add(SubtitleSearch.parse(raw as Map));
+          return {'ok': true};
       }
       final request = PlayRequest.parse(raw, widget.server);
       if (_playerOpen) return {'ok': false, 'error': 'Trình phát đang mở'};

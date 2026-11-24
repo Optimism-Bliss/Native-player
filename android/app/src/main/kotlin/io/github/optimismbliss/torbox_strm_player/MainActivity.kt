@@ -1,7 +1,9 @@
 package io.github.optimismbliss.torbox_strm_player
 
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -27,9 +29,52 @@ class MainActivity : FlutterActivity() {
                         val path = call.argument<String>("path") ?: return@setMethodCallHandler result.success(false)
                         result.success(installApk(path))
                     }
+                    // Player swipe gestures: media volume and this window's brightness (0..1).
+                    "getVolume" -> result.success(volume())
+                    "setVolume" -> {
+                        setVolume(call.argument<Double>("value") ?: 0.0)
+                        result.success(null)
+                    }
+                    "getBrightness" -> result.success(brightness())
+                    "setBrightness" -> {
+                        setBrightness(call.argument<Double>("value"))
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    private val audio get() = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+    private fun volume(): Double {
+        val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+        return audio.getStreamVolume(AudioManager.STREAM_MUSIC).toDouble() / max
+    }
+
+    private fun setVolume(value: Double) {
+        val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val index = Math.round(value.coerceIn(0.0, 1.0) * max).toInt()
+        audio.setStreamVolume(AudioManager.STREAM_MUSIC, index, 0)
+    }
+
+    /// Window brightness, or the system setting while the window follows it.
+    private fun brightness(): Double {
+        val own = window.attributes.screenBrightness
+        if (own >= 0f) return own.toDouble()
+        return try {
+            Settings.System.getInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS) / 255.0
+        } catch (e: Exception) {
+            0.5
+        }
+    }
+
+    /// null hands brightness back to the system setting.
+    private fun setBrightness(value: Double?) {
+        val attrs = window.attributes
+        attrs.screenBrightness = value?.coerceIn(0.01, 1.0)?.toFloat()
+            ?: android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        window.attributes = attrs
     }
 
     /// Hands a downloaded update to the system package installer. Returns false

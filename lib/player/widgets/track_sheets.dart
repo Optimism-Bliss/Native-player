@@ -67,38 +67,122 @@ Future<void> showAudioSheet(BuildContext context, Player player, ValueListenable
   );
 }
 
-const _sourceNames = {'addon': 'Addon', 'aiostreams': 'AIOStreams', 'upload': 'Tải lên', 'online': 'Online'};
+const _sourceNames = {'addon': 'Addon', 'aiostreams': 'AIOStreams', 'upload': 'Tải lên', 'online': 'Đã chọn trước'};
 
 String serverSubtitleLabel(ServerSubtitle s) {
   final lang = languageName(s.language);
   return [if (lang.isNotEmpty) lang, s.label].join(' · ');
 }
 
-/// Embedded tracks of the file plus the subtitles the server offers
-/// (AIOStreams and other addons, uploads, a chosen online subtitle), like the
-/// web player's subtitle menu.
+/// Subtitle picker with source chips (like switching providers in the web
+/// player): embedded tracks, server subtitles (AIOStreams and other addons,
+/// uploads) and online search results (OpenSubtitles, SubDL…).
 Future<void> showSubtitleSheet(BuildContext context, PlaybackController c) {
-  final player = c.player;
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    builder: (context) => ListenableBuilder(
-      listenable: Listenable.merge([c.active, c.serverSubtitles, c.serverSubtitleId]),
+    builder: (context) => _SubtitleSheet(c: c),
+  );
+}
+
+class _SubtitleSheet extends StatefulWidget {
+  const _SubtitleSheet({required this.c});
+  final PlaybackController c;
+
+  @override
+  State<_SubtitleSheet> createState() => _SubtitleSheetState();
+}
+
+class _SubtitleSheetState extends State<_SubtitleSheet> {
+  static const _all = '\u0000all';
+  static const _file = '\u0000file';
+  String _filter = _all;
+
+  PlaybackController get c => widget.c;
+
+  String _sourceOf(ServerSubtitle s) => _sourceNames[s.source] ?? s.source ?? 'Server';
+
+  Future<void> _search() async {
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (context) => _LanguagePicker(defaults: c.subtitleLanguages),
+    );
+    if (picked == null || picked.isEmpty) return;
+    if (mounted) setState(() => _filter = _all);
+    await c.searchOnline(picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final player = c.player;
+    final text = Theme.of(context).textTheme;
+    return ListenableBuilder(
+      listenable: Listenable.merge([c.active, c.serverSubtitles, c.serverSubtitleId, c.search]),
       builder: (context, _) {
         final selected = c.active.value.subtitle;
         final serverOn = c.serverSubtitleId.value != null && selected == c.serverSubtitleTrackId;
         final embedded = player.state.tracks.subtitle
             .where((t) => t.id != 'auto' && t.id != 'no' && !c.isServerTrack(t.id))
             .toList();
-        final server = c.serverSubtitles.value;
-        Widget header(String text) => Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Text(text, style: Theme.of(context).textTheme.labelLarge),
+        final search = c.search.value;
+        final server = [
+          ...c.serverSubtitles.value,
+          ...search.results.where((r) => !c.serverSubtitles.value.any((s) => s.id == r.id)),
+        ];
+        final sources = <String>{for (final s in server) _sourceOf(s)}.toList();
+        bool show(String source) => _filter == _all || _filter == source;
+
+        Widget chip(String label, String value) => Padding(
+          padding: const EdgeInsets.only(right: 6),
+          child: ChoiceChip(
+            label: Text(label),
+            selected: _filter == value,
+            visualDensity: VisualDensity.compact,
+            onSelected: (_) => setState(() => _filter = value),
+          ),
         );
+
         return _SheetList(
           title: 'Phụ đề',
           icon: IconsaxPlusLinear.subtitle,
           children: [
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                children: [
+                  chip('Tất cả', _all),
+                  if (embedded.isNotEmpty) chip('Trong file', _file),
+                  for (final src in sources) chip(src, src),
+                  ActionChip(
+                    avatar: const Icon(IconsaxPlusLinear.search_normal_1, size: 16),
+                    label: Text(search.done ? 'Tìm lại' : 'Tìm online'),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: search.loading ? null : _search,
+                  ),
+                ],
+              ),
+            ),
+            if (search.loading)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                child: Row(
+                  children: [
+                    const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                    const SizedBox(width: 10),
+                    Text('Đang tìm phụ đề (${search.languages})…', style: text.bodySmall),
+                  ],
+                ),
+              )
+            else if (search.done && (search.note.isNotEmpty || search.results.isEmpty))
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                child: Text(
+                  search.results.isEmpty && search.note.isEmpty ? 'Không tìm thấy phụ đề online.' : search.note,
+                  style: text.bodySmall,
+                ),
+              ),
+            const SizedBox(height: 4),
             _TrackTile(
               label: 'Tắt',
               selected: selected == 'no',
@@ -108,39 +192,86 @@ Future<void> showSubtitleSheet(BuildContext context, PlaybackController c) {
                 c.clearServerSubtitle(off: true);
               },
             ),
-            if (server.isNotEmpty) header('Từ server'),
+            if (_filter == _all || _filter == _file)
+              for (final t in embedded)
+                _TrackTile(
+                  label: subtitleTrackLabel(t),
+                  selected: t.id == selected,
+                  badge: t.uri ? 'Link' : 'Trong file',
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await player.setSubtitleTrack(t);
+                    await c.clearServerSubtitle(off: false);
+                    // mpv only shows embedded events demuxed after the switch;
+                    // an in-place seek brings back the line that is on screen now.
+                    if (!t.uri) await player.seek(player.state.position);
+                  },
+                ),
             for (final s in server)
-              _TrackTile(
-                label: serverSubtitleLabel(s),
-                selected: serverOn && c.serverSubtitleId.value == s.id,
-                badge: _sourceNames[s.source] ?? s.source,
-                onTap: () {
-                  Navigator.pop(context);
-                  c.selectServerSubtitle(s);
-                },
-              ),
-            if (embedded.isNotEmpty) header('Trong file'),
-            for (final t in embedded)
-              _TrackTile(
-                label: subtitleTrackLabel(t),
-                selected: t.id == selected,
-                badge: t.uri ? 'Link' : (t.isDefault == true ? 'Mặc định' : null),
-                onTap: () async {
-                  Navigator.pop(context);
-                  await player.setSubtitleTrack(t);
-                  await c.clearServerSubtitle(off: false);
-                  // mpv only shows embedded events demuxed after the switch;
-                  // an in-place seek brings back the line that is on screen now.
-                  if (!t.uri) await player.seek(player.state.position);
-                },
-              ),
+              if (show(_sourceOf(s)))
+                _TrackTile(
+                  label: [
+                    serverSubtitleLabel(s),
+                    if (s.exactMatch) '✓ đúng bản',
+                    if (s.downloads != null) '${s.downloads} lượt tải',
+                  ].join(' · '),
+                  selected: serverOn && c.serverSubtitleId.value == s.id,
+                  badge: s.blocked ? '${_sourceOf(s)} · hết lượt' : _sourceOf(s),
+                  onTap: s.blocked
+                      ? () {}
+                      : () {
+                          Navigator.pop(context);
+                          c.selectServerSubtitle(s);
+                        },
+                ),
             const Divider(height: 12),
             _SubtitleTuning(player: player),
           ],
         );
       },
-    ),
-  );
+    );
+  }
+}
+
+/// Languages to search, defaulting to the server's subtitle languages.
+class _LanguagePicker extends StatefulWidget {
+  const _LanguagePicker({required this.defaults});
+  final List<String> defaults;
+
+  @override
+  State<_LanguagePicker> createState() => _LanguagePickerState();
+}
+
+class _LanguagePickerState extends State<_LanguagePicker> {
+  static const _common = ['vi', 'en', 'ja', 'ko', 'zh', 'th', 'fr', 'es', 'de'];
+  late final Set<String> _picked = {...widget.defaults};
+
+  @override
+  Widget build(BuildContext context) {
+    final all = {...widget.defaults, ..._common}.toList();
+    return AlertDialog(
+      title: const Text('Tìm phụ đề online'),
+      content: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          for (final l in all)
+            FilterChip(
+              label: Text(languageName(l).isEmpty ? l : languageName(l)),
+              selected: _picked.contains(l),
+              onSelected: (on) => setState(() => on ? _picked.add(l) : _picked.remove(l)),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Huỷ')),
+        FilledButton(
+          onPressed: _picked.isEmpty ? null : () => Navigator.pop(context, all.where(_picked.contains).join(',')),
+          child: const Text('Tìm'),
+        ),
+      ],
+    );
+  }
 }
 
 class _SheetList extends StatelessWidget {
