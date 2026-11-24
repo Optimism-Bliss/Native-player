@@ -63,6 +63,21 @@ Chạm: hiện/ẩn điều khiển. Chạm đúp trái/phải: ±10 giây, gi�
 - **Phụ đề từ máy:** chip "Từ máy" trong bảng Phụ đề (`file_picker`), nhận .srt/.ass/.ssa/.vtt, tự đoán mã hoá (UTF-8, UTF-16, Latin-1; VNI/TCVN3 chưa chuyển đổi). Gắn với file đang xem, nạp lại sau khi player tự mở lại. Chưa thử trên Android (hộp chọn file của hệ thống).
 - **Tốc độ phát:** nút đồng hồ cạnh nút tỉ lệ khung hình, 0.5×–2×, mặc định 1× cho mỗi phiên; mpv giữ cao độ giọng. Đã thử 2× trên Linux.
 
+## Nhánh `dev` (chưa phát hành)
+
+- **Android: trang trong app khác Chrome (khoảng trống lớn, chữ to).** `webview_all_android` tắt thẻ viewport (`setUseWideViewPort(false)`), nên WebView coi trang là trang máy tính và tự phóng chữ (text autosizing): thẻ diễn viên dài ra, để lại khoảng đen. `BrowserScreen._setup()` bật lại viewport và cố định `setTextZoom(100)`. Mỗi trang ghi một dòng `viewport w=… dpr=… font=… safe=…` vào log để so với trình duyệt. Cần xác nhận trên điện thoại.
+- **Windows không hiện trang đăng nhập:** chưa tái hiện được (không có máy Windows). Đã thêm log từng bước tải trang, báo lỗi sau 20 giây nếu trang không lên, mục **Nhật ký** (xem + chép) trong menu và trên bảng lỗi. Cần log từ máy người dùng (`%LOCALAPPDATA%\TorBoxSTRM\torbox-strm.log`).
+- **Phát trên TV (MVP Android TV)** — `lib/tv/`:
+  - TV (`isTvDevice`, nhận qua `UiModeManager`/leanback trong `MainActivity.kt`) mở `TvHome`: mã QR + mã 6 số (đổi mỗi 5 phút, dùng một lần, sai 5 lần thì đổi), và `TvReceiver`: máy chủ HTTP trong mạng LAN, cổng 47800, chỉ nhận IP mạng nhà.
+  - QR là link `http://<ip-tv>:47800/pair?c=…`; camera nào cũng mở được. Trang đó có nút `intent://` mở app trên điện thoại (`torboxstrm://pair?...`, intent filter trong manifest). Hoặc nhập tay: menu → Kết nối TV.
+  - Điện thoại đổi mã lấy token ngẫu nhiên 24 byte (`TvClient.pair`). Khi bấm ▶, app hỏi "Phát trên thiết bị này / Phát trên TV".
+  - TV nhận **đúng tin nhắn `play` của trang web**, kiểm tra bằng `PlayRequest.parse` như trong app, rồi phát thẳng `/s/` `/x/` từ server (hai đường này không cần cookie). Không đi qua relay, không chiếu màn hình.
+  - `PageLink` của player trên TV đi qua điện thoại: TV hỏi trang (phụ đề, tìm phụ đề, tiến độ) → `GET /poll` → điện thoại gọi `TorBoxStrmBridge.event` trên trang của mình → câu trả lời `POST /page` về TV. Vì vậy phụ đề AIOStreams, tìm phụ đề online và lưu tiến độ chạy trên TV mà TV không cần đăng nhập.
+  - Điều khiển từ điện thoại (`TvRemoteScreen`): phát/dừng, thanh tua, ±10/30 s, tập trước/sau, âm lượng, âm thanh, phụ đề (trong file + của server), dừng. Trạng thái làm mới mỗi giây.
+  - D-pad trên TV (`PlayerScreen._onTvKey`): khi ẩn điều khiển: ◀ ▶ tua 10 s, OK phát/dừng và hiện điều khiển (focus vào nút phát), ▲ ▼ hiện điều khiển. Khi hiện: D-pad di chuyển giữa các nút, OK bấm nút. Back ẩn điều khiển (đang phát) rồi mới thoát. Phím media của remote cũng dùng được.
+  - Đã kiểm thử: `test/tv_test.dart` (ghép đôi, sai mã, mã dùng một lần, token lạ, kiểm tra lệnh phát, chuyển tiếp phụ đề, poll). Trên Linux với `TORBOXSTRM_TV=1` (chạy bản desktop như TV) + `curl` đóng vai điện thoại: trang QR, ghép đôi, phát hàng đợi 2 tập từ backend thử, tạm dừng/tua/lùi/đổi âm thanh/tập sau, phím ▶ OK Back, sự kiện `closed`.
+  - Chưa kiểm thử: điện thoại thật → TV box thật (camera mở link, intent mở app, Wi-Fi tách khách/AP isolation), focus D-pad trong các bảng chọn track, banner trên launcher TV. Lưu lượng LAN là HTTP không mã hoá (token đi kèm mỗi lệnh); chỉ dùng trong mạng nhà.
+
 ## Làm sau
 
 Từ bản rà soát mô tả bàn giao ban đầu:
@@ -75,7 +90,7 @@ Từ bản rà soát mô tả bàn giao ban đầu:
 Thêm:
 
 5. Ký APK bằng khoá release (thêm secrets) và cân nhắc gói Linux (AppImage/Flatpak có sẵn WebKitGTK) cùng bộ cài Windows.
-6. Android TV: điều hướng bằng remote, banner, `LEANBACK_LAUNCHER`.
+6. Android TV: đã có MVP "Phát trên TV" (nhánh `dev`); còn lại: tìm TV tự động trong LAN (mDNS), duyệt web trên TV bằng D-pad.
 7. Kiểm thử theo thiết bị (máy/GPU/màn hình): H.264 SDR, HEVC Main10/HDR10, MKV nhiều audio/phụ đề, AV1, HLG, Dolby Vision, ASS/PGS. Phân biệt "giải mã được" với "xuất đúng HDR".
 8. Nút ▶ trên web bị trùng: nút tròn ▶ và "▶ Phát" đều mở player trong app.
 9. **Desktop chỉ nên chạy một instance.** Mở app lần hai trên Linux thì WebView trắng ("named profile is in use by another process"); Windows có thể tương tự. Linux: bỏ `G_APPLICATION_NON_UNIQUE` và cho `activate` đưa cửa sổ cũ lên; Windows: mutex + chuyển tiếp sang cửa sổ đang chạy. Làm cùng phần deep link.

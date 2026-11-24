@@ -12,7 +12,9 @@ import 'screens/connect_screen.dart';
 import 'settings.dart';
 import 'theme.dart';
 import 'util/fullscreen.dart';
+import 'tv/tv_home.dart';
 import 'util/log.dart';
+import 'util/tv_mode.dart';
 
 Future<void> main() async {
   runZonedGuarded(_start, (error, stack) => appLog('uncaught: $error\n$stack'));
@@ -41,6 +43,7 @@ Future<void> _start() async {
     );
   }
   if (Platform.isWindows) await prepareWindowsWebView();
+  await detectTv();
   final server = await ServerStore.load();
   runApp(TorboxStrmApp(server: server));
 }
@@ -55,7 +58,11 @@ class TorboxStrmApp extends StatelessWidget {
       title: 'TorBox STRM',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
-      home: server == null ? const ConnectScreen() : BrowserScreen(server: server!),
+      home: isTvDevice
+          ? TvHome(server: server)
+          : server == null
+          ? const ConnectScreen()
+          : BrowserScreen(server: server!),
     );
   }
 }

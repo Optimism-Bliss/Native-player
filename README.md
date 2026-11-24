@@ -32,6 +32,7 @@ App tự kiểm tra bản mới trên GitHub Releases của repo này (menu ⋯ 
 - Desktop: click để phát/dừng, double-click để toàn màn hình. Phím: Space/K, ←/→ ±5 s, J/L −10/+30 s, ↑/↓ âm lượng, M tắt tiếng, F/F11 toàn màn hình, N/P tập sau/trước, Esc thoát.
 - Cảm ứng: chạm để hiện/ẩn điều khiển, chạm đúp trái/phải để tua ±10 s.
 - Hộp "Thông tin phát" hiện container, codec, pixel format, màu/HDR, giải mã phần cứng. Dùng nó khi kiểm thử trên thiết bị thật.
+- Phát trên TV: app trên Android TV hiện mã QR; điện thoại quét để kết nối, rồi chọn "Phát trên TV" khi bấm ▶. TV phát thẳng từ server, điện thoại làm điều khiển. Remote TV: ◀ ▶ tua, OK phát/dừng, Back thoát.
 - Tự chuyển tập kế khi hết tập. Tiến độ được gửi mỗi 15 giây, khi tạm dừng và khi đóng.
 
 ## Build
@@ -62,6 +63,7 @@ GitHub Actions (`.github/workflows/build.yml`) build cả Linux x64/arm64, Windo
 | `lib/player/playback_controller.dart` | Lõi phát: libmpv dùng chung (`PlayerHost`), mở/thử lại, track, tiến độ |
 | `lib/player/player_screen.dart` | Màn hình phát và điều khiển kiểu Fladder |
 | `lib/player/widgets/` | Thanh tiến độ, bảng chọn track, hộp thông tin |
+| `lib/tv/` | Phát trên TV: ghép đôi bằng QR, máy chủ LAN trên TV, điều khiển từ điện thoại |
 | `third_party/media_kit_video/` | `media_kit_video` (MIT) từ fork DonutWare, có vá phần dọn EGL trên Linux (xem `docs/HANDOFF.md`) |
 
 Thông tin bàn giao, kết quả kiểm thử và các việc làm sau nằm trong [`docs/HANDOFF.md`](docs/HANDOFF.md).
@@ -70,6 +72,7 @@ Thông tin bàn giao, kết quả kiểm thử và các việc làm sau nằm tr
 
 - [media_kit](https://github.com/media-kit/media-kit) / [DonutWare fork](https://github.com/DonutWare/media-kit): MIT. libmpv/FFmpeg đi kèm theo giấy phép LGPL/GPL của bản build tương ứng.
 - [webview_all](https://pub.dev/packages/webview_all): MIT.
+- [qr_flutter](https://pub.dev/packages/qr_flutter): BSD-3-Clause (mã QR trên TV).
 - Phông Rubik (SIL OFL 1.1) và Droid Sans Fallback (Apache 2.0), lấy từ asset của Fladder.
 - Giao diện player tham khảo bố cục của Fladder (GPLv3).
 

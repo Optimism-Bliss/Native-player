@@ -1,6 +1,9 @@
 package io.github.optimismbliss.torbox_strm_player
 
+import android.app.UiModeManager
 import android.content.ActivityNotFoundException
+import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
@@ -14,13 +17,25 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    private var channel: MethodChannel? = null
+
+    /// Pairing link (torboxstrm://pair?...) that opened the app, until Flutter reads it.
+    private var pendingLink: String? = null
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        pendingLink = pairLink(intent)
         // Opens the web UI's "intent://…" links for external players (VLC, MX Player…)
         // exactly as Chrome would, including S.browser_fallback_url.
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "torboxstrm/intent")
-            .setMethodCallHandler { call, result ->
+        channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "torboxstrm/intent")
+        channel!!.setMethodCallHandler { call, result ->
                 when (call.method) {
+                    // Android TV / Google TV / TV boxes: the app becomes a "Play on TV" receiver.
+                    "isTv" -> result.success(isTv())
+                    "initialLink" -> {
+                        result.success(pendingLink)
+                        pendingLink = null
+                    }
                     "open" -> {
                         val raw = call.argument<String>("uri") ?: return@setMethodCallHandler result.success(false)
                         result.success(openIntentUri(raw))
@@ -43,6 +58,23 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        val link = pairLink(intent) ?: return
+        channel?.invokeMethod("link", link) ?: run { pendingLink = link }
+    }
+
+    private fun pairLink(intent: Intent?): String? {
+        val data = intent?.data ?: return null
+        return if (data.scheme == "torboxstrm" && data.host == "pair") data.toString() else null
+    }
+
+    private fun isTv(): Boolean {
+        val ui = getSystemService(Context.UI_MODE_SERVICE) as UiModeManager
+        return ui.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
+            packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
     }
 
     private val audio get() = getSystemService(Context.AUDIO_SERVICE) as AudioManager

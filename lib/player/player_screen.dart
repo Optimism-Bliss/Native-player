@@ -11,6 +11,7 @@ import '../bridge.dart';
 import '../util/device_controls.dart';
 import '../util/format.dart';
 import '../util/fullscreen.dart';
+import '../util/tv_mode.dart';
 import 'playback_controller.dart';
 import 'widgets/progress_bar.dart';
 import 'widgets/track_sheets.dart';
@@ -19,10 +20,24 @@ import 'widgets/track_sheets.dart';
 /// gradient top bar with the title, a bottom panel with progress, info chips,
 /// track buttons and a large tonal play button; mouse hover reveals controls,
 /// touch uses tap / double-tap-to-seek.
+/// Lets something outside the screen (the TV receiver) drive the open player.
+class PlayerRemote {
+  PlaybackController? controller;
+  Future<void> Function()? close;
+}
+
 class PlayerScreen extends StatefulWidget {
-  const PlayerScreen({super.key, required this.request, required this.onProgress, required this.onClosed, this.page});
+  const PlayerScreen({
+    super.key,
+    required this.request,
+    required this.onProgress,
+    required this.onClosed,
+    this.page,
+    this.remote,
+  });
 
   final PageLink? page;
+  final PlayerRemote? remote;
 
   final PlayRequest request;
   final ProgressCallback onProgress;
@@ -40,6 +55,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   );
   late final Future<void> _ready = c.init();
   final FocusNode _focus = FocusNode();
+  final FocusNode _playFocus = FocusNode(debugLabel: 'play');
 
   bool _overlay = true;
   Timer? _hideTimer;
@@ -69,10 +85,29 @@ class _PlayerScreenState extends State<PlayerScreen> {
     super.initState();
     FullscreenHelper.enterPlayer();
     _restartHideTimer();
+    widget.remote
+      ?..controller = c
+      ..close = _close;
+    // Resumed from elsewhere (TV remote, phone): let the controls fade again.
+    _ready.then((_) {
+      if (!mounted) return;
+      _playingSub = c.player.stream.playing.listen((playing) {
+        if (playing && _overlay) _restartHideTimer();
+      });
+    }, onError: (_) {});
   }
+
+  StreamSubscription<bool>? _playingSub;
 
   @override
   void dispose() {
+    if (widget.remote?.controller == c) {
+      widget.remote!
+        ..controller = null
+        ..close = null;
+    }
+    _playFocus.dispose();
+    _playingSub?.cancel();
     _hideTimer?.cancel();
     _seekFlashTimer?.cancel();
     _focus.dispose();
@@ -106,6 +141,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _setOverlay(bool show) {
     setState(() => _overlay = show);
+    // TV: hidden controls must not keep the D-pad focus
+    if (!show && isTvDevice && _focus.canRequestFocus) _focus.requestFocus();
     if (c.initialized) c.raiseSubtitles(show);
   }
 
@@ -335,6 +372,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _showOverlay();
     }
 
+    if (isTvDevice) {
+      final r = _onTvKey(key, repeat);
+      if (r != null) return r;
+    }
+
     if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.keyK || key == LogicalKeyboardKey.mediaPlayPause) {
       if (!repeat) act(c.player.playOrPause);
     } else if (key == LogicalKeyboardKey.arrowLeft) {
@@ -369,12 +411,85 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return KeyEventResult.handled;
   }
 
+  static final _select = {
+    LogicalKeyboardKey.select,
+    LogicalKeyboardKey.enter,
+    LogicalKeyboardKey.numpadEnter,
+    LogicalKeyboardKey.gameButtonA,
+  };
+  static final _arrows = {
+    LogicalKeyboardKey.arrowLeft,
+    LogicalKeyboardKey.arrowRight,
+    LogicalKeyboardKey.arrowUp,
+    LogicalKeyboardKey.arrowDown,
+  };
+
+  /// TV remote. Controls hidden: ◀ ▶ seek 10 s, OK / ▲ ▼ show the controls with
+  /// the play button focused. Controls shown: the D-pad moves between buttons
+  /// and OK presses the focused one. Back hides the controls first. null = not
+  /// a TV-specific key (fall through to the common keys).
+  KeyEventResult? _onTvKey(LogicalKeyboardKey key, bool repeat) {
+    if (key == LogicalKeyboardKey.mediaFastForward) {
+      _seek(30);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.mediaRewind) {
+      _seek(-10);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.mediaTrackNext) {
+      if (!repeat && c.hasNext) c.next();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.mediaTrackPrevious) {
+      if (!repeat && c.hasPrevious) c.previous();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.mediaPlay) {
+      c.player.play();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.mediaPause) {
+      c.player.pause();
+      return KeyEventResult.handled;
+    }
+    final navigable = _arrows.contains(key) || _select.contains(key);
+    if (!navigable) return null;
+    if (_overlay) {
+      _restartHideTimer();
+      // nothing focused yet: start on the play button
+      if (FocusManager.instance.primaryFocus == _focus) {
+        _playFocus.requestFocus();
+        return KeyEventResult.handled;
+      }
+      // let focus traversal / the focused button handle it
+      return KeyEventResult.ignored;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      _seek(-10);
+    } else if (key == LogicalKeyboardKey.arrowRight) {
+      _seek(10);
+    } else if (!repeat) {
+      if (_select.contains(key)) c.player.playOrPause();
+      _showOverlay();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _overlay) _playFocus.requestFocus();
+      });
+    }
+    return KeyEventResult.handled;
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _close();
+        if (didPop) return;
+        if (isTvDevice && _overlay && c.initialized && c.player.state.playing) {
+          _setOverlay(false);
+          return;
+        }
+        _close();
       },
       child: Scaffold(
         backgroundColor: Colors.black,
@@ -756,6 +871,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         stream: c.player.stream.playing,
         initialData: c.player.state.playing,
         builder: (context, snap) => IconButton.filledTonal(
+          focusNode: _playFocus,
           iconSize: phone ? 32 : 38,
           tooltip: snap.data == true ? 'Tạm dừng' : 'Phát',
           onPressed: () {

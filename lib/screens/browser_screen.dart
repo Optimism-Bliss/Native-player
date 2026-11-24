@@ -14,7 +14,11 @@ import '../bridge.dart';
 import '../player/playback_controller.dart';
 import '../player/player_screen.dart';
 import '../settings.dart';
+import '../tv/protocol.dart';
+import '../tv/remote_screen.dart';
+import '../tv/sender.dart';
 import '../util/fullscreen.dart';
+import '../util/tv_mode.dart';
 import '../update/update_ui.dart';
 import '../update/updater.dart';
 import '../util/log.dart';
@@ -44,6 +48,11 @@ class _BrowserScreenState extends State<BrowserScreen> {
   String _version = '';
   bool _loaded = false;
 
+  /// "Play on TV": the paired TV and the playback running on it (phones / desktop only).
+  PairedTv? _tv;
+  TvSession? _tvSession;
+  bool get _canCast => !isTvDevice;
+
   static String get _platform => Platform.isAndroid
       ? 'android'
       : Platform.isWindows
@@ -61,6 +70,173 @@ class _BrowserScreenState extends State<BrowserScreen> {
       if (mounted) checkForUpdate(context, automatic: true);
     });
     Updater.currentVersion().then((v) => mounted ? setState(() => _version = v) : null);
+    if (_canCast) _initTv();
+  }
+
+  // ---------------- Play on TV ----------------
+
+  Future<void> _initTv() async {
+    final tv = await PairedTv.load();
+    if (mounted) setState(() => _tv = tv);
+    if (!Platform.isAndroid) return;
+    // pairing links: torboxstrm://pair?... from the TV's QR page
+    _intentChannel.setMethodCallHandler((call) async {
+      if (call.method == 'link' && call.arguments is String) await _pairFromLink(call.arguments as String);
+      return null;
+    });
+    try {
+      final link = await _intentChannel.invokeMethod<String>('initialLink');
+      if (link != null) await _pairFromLink(link);
+    } catch (e) {
+      appLog('initial link: $e');
+    }
+  }
+
+  Future<void> _pairFromLink(String raw) async {
+    final link = PairLink.parse(raw);
+    if (link == null) {
+      _snack('Liên kết kết nối TV không hợp lệ');
+      return;
+    }
+    await _pair(link);
+  }
+
+  Future<void> _pair(PairLink link) async {
+    try {
+      final tv = await TvClient.pair(link);
+      await PairedTv.save(tv);
+      if (!mounted) return;
+      setState(() => _tv = tv);
+      _snack('Đã kết nối ${tv.name}. Bấm ▶ trên phim để chọn "Phát trên TV".');
+    } on TvError catch (e) {
+      if (mounted) _snack(e.message);
+    }
+  }
+
+  /// Manual pairing: the address and code shown on the TV.
+  Future<void> _pairManually() async {
+    final address = TextEditingController(text: _tv == null ? '' : '${_tv!.host}:${_tv!.port}');
+    final code = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Kết nối TV'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Mở app TorBox STRM trên TV (cùng mạng Wi-Fi), rồi nhập địa chỉ và mã hiện trên TV.'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: address,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(labelText: 'Địa chỉ TV', hintText: '192.168.1.20:$tvPort'),
+            ),
+            TextField(
+              controller: code,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              decoration: const InputDecoration(labelText: 'Mã 6 số'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Huỷ')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Kết nối')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final parts = address.text.trim().split(':');
+    final link = PairLink.parse(
+      PairLink(
+        host: parts.first,
+        port: parts.length > 1 ? int.tryParse(parts[1]) ?? tvPort : tvPort,
+        code: code.text.trim(),
+      ).toUri().toString(),
+    );
+    if (link == null) {
+      _snack('Địa chỉ phải là IP trong mạng nhà (vd 192.168.1.20) và mã gồm 6 số');
+      return;
+    }
+    await _pair(link);
+  }
+
+  Future<void> _forgetTv() async {
+    _tvSession?.stop();
+    await PairedTv.save(null);
+    if (mounted) setState(() => _tv = null);
+  }
+
+  /// Where to play: this device or the paired TV.
+  Future<void> _chooseTarget(PlayRequest request, Object raw) async {
+    final tv = _tv!;
+    final where = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                request.queue[request.index].title,
+                style: Theme.of(context).textTheme.titleMedium,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(IconsaxPlusLinear.mobile),
+              title: const Text('Phát trên thiết bị này'),
+              onTap: () => Navigator.pop(context, 'here'),
+            ),
+            ListTile(
+              leading: const Icon(IconsaxPlusLinear.monitor),
+              title: Text('Phát trên ${tv.name}'),
+              onTap: () => Navigator.pop(context, 'tv'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || where == null) return;
+    if (where == 'here') {
+      if (!_playerOpen) await _openPlayer(request);
+      return;
+    }
+    await _castToTv(tv, raw);
+  }
+
+  Future<void> _castToTv(PairedTv tv, Object raw) async {
+    final old = _tvSession;
+    final session = (old != null && old.running && old.client.tv.token == tv.token)
+        ? old
+        : TvSession(client: TvClient(tv), toPage: _sendEvent);
+    try {
+      await session.client.play(widget.server, raw);
+    } on TvError catch (e) {
+      _snack(e.message);
+      return;
+    }
+    if (old != null && old != session) old.stop();
+    _tvSession = session;
+    if (!session.running) {
+      unawaited(session.start().whenComplete(() => mounted ? setState(() {}) : null));
+    }
+    if (mounted) setState(() {});
+    await _openRemote();
+  }
+
+  Future<void> _openRemote() async {
+    final session = _tvSession;
+    final tv = _tv;
+    if (session == null || tv == null || !mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => TvRemoteScreen(session: session, tvName: tv.name),
+      ),
+    );
   }
 
   /// Each step is independent: one unsupported call on a platform must not
@@ -259,6 +435,12 @@ class _BrowserScreenState extends State<BrowserScreen> {
     final raw = call.arguments.isEmpty ? null : call.arguments.first;
     final type = raw is Map ? raw['type'] : null;
     try {
+      // the page answers the player that asked: the TV's while it plays there
+      final tv = _tvSession;
+      if (!_playerOpen && tv != null && tv.running && (type == 'subs' || type == 'subText' || type == 'subSearch')) {
+        tv.client.page(raw!).catchError((Object e) => appLog('tv page relay: $e'));
+        return {'ok': true};
+      }
       switch (type) {
         case 'subs':
           _toPlayer.add(SubtitleList.parse(raw as Map));
@@ -272,7 +454,11 @@ class _BrowserScreenState extends State<BrowserScreen> {
       }
       final request = PlayRequest.parse(raw, widget.server);
       if (_playerOpen) return {'ok': false, 'error': 'Trình phát đang mở'};
-      _openPlayer(request);
+      if (_canCast && _tv != null) {
+        _chooseTarget(request, raw!);
+      } else {
+        _openPlayer(request);
+      }
       return {'ok': true};
     } on FormatException catch (e) {
       return {'ok': false, 'error': e.message};
@@ -354,6 +540,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
               ('quit', IconsaxPlusLinear.close_circle, 'Thoát app'),
             ])
               ListTile(leading: Icon(icon), title: Text(label), onTap: () => Navigator.pop(context, value)),
+            if (_canCast) ..._tvMenuTiles(context),
           ],
         ),
       ),
@@ -371,6 +558,41 @@ class _BrowserScreenState extends State<BrowserScreen> {
         if (mounted) await checkForUpdate(context);
       case 'quit':
         await SystemNavigatorPop.pop();
+      default:
+        await _onTvMenu(choice);
+    }
+  }
+
+  List<Widget> _tvMenuTiles(BuildContext context) => [
+    const Divider(height: 1),
+    if (_tvSession?.running == true)
+      ListTile(
+        leading: const Icon(IconsaxPlusLinear.monitor_recorder),
+        title: Text('Điều khiển ${_tv?.name ?? 'TV'}'),
+        onTap: () => Navigator.pop(context, 'tv-remote'),
+      ),
+    ListTile(
+      leading: const Icon(IconsaxPlusLinear.monitor),
+      title: Text(_tv == null ? 'Kết nối TV' : 'Kết nối TV khác'),
+      subtitle: _tv == null ? null : Text('Đang dùng: ${_tv!.name} (${_tv!.host})'),
+      onTap: () => Navigator.pop(context, 'tv-pair'),
+    ),
+    if (_tv != null)
+      ListTile(
+        leading: const Icon(IconsaxPlusLinear.monitor_mobbile),
+        title: const Text('Ngắt kết nối TV'),
+        onTap: () => Navigator.pop(context, 'tv-forget'),
+      ),
+  ];
+
+  Future<void> _onTvMenu(String? choice) async {
+    switch (choice) {
+      case 'tv-remote':
+        await _openRemote();
+      case 'tv-pair':
+        await _pairManually();
+      case 'tv-forget':
+        await _forgetTv();
     }
   }
 
@@ -490,7 +712,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
               'server' => _changeServer(),
               'update' => checkForUpdate(context),
               'log' => _showLog(),
-              _ => null,
+              _ => _onTvMenu(v),
             },
             itemBuilder: (_) => [
               const PopupMenuItem(
@@ -509,6 +731,23 @@ class _BrowserScreenState extends State<BrowserScreen> {
                   subtitle: _version.isEmpty ? null : Text('Bản $_version'),
                 ),
               ),
+              if (_tvSession?.running == true)
+                const PopupMenuItem(
+                  value: 'tv-remote',
+                  child: ListTile(leading: Icon(IconsaxPlusLinear.monitor_recorder), title: Text('Điều khiển TV')),
+                ),
+              PopupMenuItem(
+                value: 'tv-pair',
+                child: ListTile(
+                  leading: const Icon(IconsaxPlusLinear.monitor),
+                  title: Text(_tv == null ? 'Kết nối TV' : 'Kết nối TV khác'),
+                ),
+              ),
+              if (_tv != null)
+                const PopupMenuItem(
+                  value: 'tv-forget',
+                  child: ListTile(leading: Icon(IconsaxPlusLinear.monitor_mobbile), title: Text('Ngắt kết nối TV')),
+                ),
               const PopupMenuItem(
                 value: 'log',
                 child: ListTile(leading: Icon(IconsaxPlusLinear.document_text), title: Text('Nhật ký')),
