@@ -143,12 +143,16 @@ jobs:
             exit 0
           fi
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          # Keys created with the same store and key password need only one secret.
           {
             echo "storeFile=$RUNNER_TEMP/release.jks"
             echo "storePassword=$KEYSTORE_PASSWORD"
-            echo "keyAlias=$KEY_ALIAS"
-            echo "keyPassword=$KEY_PASSWORD"
+            echo "keyAlias=${KEY_ALIAS:-torboxstrm}"
+            echo "keyPassword=${KEY_PASSWORD:-$KEYSTORE_PASSWORD}"
           } > android/key.properties
+          # Public certificate fingerprint, to check the secret is the expected key.
+          keytool -list -v -keystore "$RUNNER_TEMP/release.jks" -storepass "$KEYSTORE_PASSWORD" -alias "${KEY_ALIAS:-torboxstrm}" \
+            | grep -E "SHA256:|SHA-256" | head -1
       - run: flutter build apk --release --split-per-abi
       - name: Package
         run: |
