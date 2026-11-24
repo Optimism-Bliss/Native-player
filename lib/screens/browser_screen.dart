@@ -8,6 +8,7 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_all/webview_all.dart';
+import 'package:webview_all_android/webview_all_android.dart';
 
 import '../bridge.dart';
 import '../player/playback_controller.dart';
@@ -79,6 +80,16 @@ class _BrowserScreenState extends State<BrowserScreen> {
     await step('javascript', () => _web.setJavaScriptMode(JavaScriptMode.unrestricted));
     await step('background', () => _web.setBackgroundColor(const Color(0xFF0B0D12)));
     await step('media', () => _web.setMediaPlaybackRequiresUserGesture(false));
+    // Android WebView defaults differ from Chrome: the plugin turns the
+    // viewport meta tag off (useWideViewPort=false + overview mode, so a page
+    // wider than the screen is zoomed out and gains empty margins) and the
+    // WebView multiplies all text by the system font scale. Make it lay the
+    // page out like the mobile browser does.
+    if (Platform.isAndroid) {
+      final android = _web.platform as AndroidWebViewController;
+      await step('viewport', () => android.setUseWideViewPort(true));
+      await step('text zoom', () => android.setTextZoom(100));
+    }
     // Handlers and user scripts must be registered before the first load.
     await step('bridge', () async {
       final ok = await _web.addJavaScriptHandler(
@@ -101,6 +112,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
           onNavigationRequest: _onNavigation,
           onProgress: (p) => mounted ? setState(() => _progress = p) : null,
           onPageStarted: (_) => mounted ? setState(() => _loadError = null) : null,
+          onPageFinished: (_) => _logViewport(),
           onWebResourceError: (e) {
             if (e.isForMainFrame == false || !mounted) return;
             appLog('page error ${e.errorCode}: ${e.description}');
@@ -114,6 +126,24 @@ class _BrowserScreenState extends State<BrowserScreen> {
     } catch (e, st) {
       appLog('webview load failed: $e\n$st');
       if (mounted) setState(() => _loadError = 'Không mở được trang: $e');
+    }
+  }
+
+  /// One line in the app log per page: what the page actually sees, to
+  /// compare the app with the phone's browser when the layout differs.
+  Future<void> _logViewport() async {
+    try {
+      final r = await _web.runJavaScriptReturningResult(
+        "(()=>{const d=document.createElement('div');d.style.cssText='position:fixed;"
+        "padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';"
+        "document.body.appendChild(d);const c=getComputedStyle(d);"
+        "const s=[c.paddingTop,c.paddingRight,c.paddingBottom,c.paddingLeft].join(' ');d.remove();"
+        "return 'w='+innerWidth+' h='+innerHeight+' dpr='+devicePixelRatio+' scroll='+document.documentElement.scrollWidth"
+        "+' scale='+(window.visualViewport?visualViewport.scale:1)+' font='+getComputedStyle(document.body).fontSize+' safe='+s})()",
+      );
+      appLog('viewport $r');
+    } catch (e) {
+      appLog('viewport metrics failed: $e');
     }
   }
 

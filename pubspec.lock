@@ -897,7 +897,7 @@ packages:
     source: hosted
     version: "1.5.2"
   webview_all_android:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: webview_all_android
       sha256: "3295c5d53907224c3046e882aa165e987c5c67834b36e93bcacedfaa61ba696f"
