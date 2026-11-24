@@ -42,6 +42,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
   String? _loadError;
   bool _playerOpen = false;
   String _version = '';
+  bool _loaded = false;
 
   static String get _platform => Platform.isAndroid
       ? 'android'
@@ -111,8 +112,15 @@ class _BrowserScreenState extends State<BrowserScreen> {
         NavigationDelegate(
           onNavigationRequest: _onNavigation,
           onProgress: (p) => mounted ? setState(() => _progress = p) : null,
-          onPageStarted: (_) => mounted ? setState(() => _loadError = null) : null,
-          onPageFinished: (_) => _logViewport(),
+          onPageStarted: (url) {
+            appLog('page started $url');
+            if (mounted) setState(() => _loadError = null);
+          },
+          onPageFinished: (url) {
+            appLog('page finished $url');
+            _loaded = true;
+            _logViewport();
+          },
           onWebResourceError: (e) {
             if (e.isForMainFrame == false || !mounted) return;
             appLog('page error ${e.errorCode}: ${e.description}');
@@ -121,12 +129,52 @@ class _BrowserScreenState extends State<BrowserScreen> {
         ),
       );
     });
+    // Nothing visible after a while (seen on some Windows PCs): say so instead
+    // of leaving an empty window, and point at the log.
+    Future<void>.delayed(const Duration(seconds: 20), () {
+      if (!mounted || _loaded || _loadError != null) return;
+      appLog('page not loaded after 20 s (progress $_progress%)');
+      setState(() => _loadError = 'Trang không phản hồi sau 20 giây (tiến độ $_progress%).');
+    });
+    appLog('load ${widget.server.origin}');
     try {
       await _web.loadRequest(widget.server);
     } catch (e, st) {
       appLog('webview load failed: $e\n$st');
-      if (mounted) setState(() => _loadError = 'Không mở được trang: $e');
+      final busy = '$e'.contains('in use by another process');
+      if (mounted) {
+        setState(
+          () => _loadError = busy
+              ? 'App đang mở ở một cửa sổ khác (hoặc chưa tắt hẳn). Đóng cửa sổ đó rồi mở lại.'
+              : 'Không mở được trang: $e',
+        );
+      }
     }
+  }
+
+  Future<void> _showLog() async {
+    final text = readLogTail();
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Nhật ký'),
+        content: SizedBox(
+          width: 720,
+          height: 420,
+          child: SingleChildScrollView(
+            reverse: true,
+            child: SelectableText(text, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Clipboard.setData(ClipboardData(text: '$logFilePath\n$text')),
+            child: const Text('Chép'),
+          ),
+          FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Đóng')),
+        ],
+      ),
+    );
   }
 
   /// One line in the app log per page: what the page actually sees, to
@@ -381,6 +429,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
                                       label: const Text('Thử lại'),
                                     ),
                                     OutlinedButton(onPressed: _changeServer, child: const Text('Đổi máy chủ')),
+                                    if (isDesktop) TextButton(onPressed: _showLog, child: const Text('Nhật ký')),
                                   ],
                                 ),
                               ],
@@ -440,6 +489,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
               'signout' => _signOut(),
               'server' => _changeServer(),
               'update' => checkForUpdate(context),
+              'log' => _showLog(),
               _ => null,
             },
             itemBuilder: (_) => [
@@ -458,6 +508,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
                   title: const Text('Kiểm tra cập nhật'),
                   subtitle: _version.isEmpty ? null : Text('Bản $_version'),
                 ),
+              ),
+              const PopupMenuItem(
+                value: 'log',
+                child: ListTile(leading: Icon(IconsaxPlusLinear.document_text), title: Text('Nhật ký')),
               ),
             ],
           ),
