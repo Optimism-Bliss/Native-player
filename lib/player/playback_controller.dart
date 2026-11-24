@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
@@ -152,6 +153,9 @@ class PlaybackController {
       // Per-file subtitle delay must not leak into the next session.
       await native.setProperty('sub-delay', '0');
     }
+    // The shared player keeps its speed; every session starts at 1×.
+    await player.setRate(1.0);
+    if (native is NativePlayer) {}
     // Controls are visible when the player opens.
     await raiseSubtitles(true);
 
@@ -195,6 +199,12 @@ class PlaybackController {
     // reopening this URL is also how an expired CDN link is renewed.
     // Opening (or reopening after an error) drops every external subtitle
     // track in mpv, so the server subtitle state starts over each time.
+    final reopenLocal = _localKey == item.key ? serverSubtitleId.value : null;
+    if (_localKey != item.key) {
+      _localKey = item.key;
+      localSubtitles.value = const [];
+      _localTexts.clear();
+    }
     serverSubtitles.value = const [];
     serverSubtitleId.value = null;
     if (search.value.key != item.key) search.value = const SubtitleSearchState();
@@ -205,6 +215,9 @@ class PlaybackController {
     // same choice the web player would make). It answers with subs/subText.
     final link = page;
     if (link != null) unawaited(link.send({'type': 'subs', 'key': item.key}));
+    // Reopened after an error with a device subtitle on: load it again.
+    final local = localSubtitles.value.where((l) => l.id == reopenLocal).firstOrNull;
+    if (local != null) unawaited(selectLocalSubtitle(local));
     final sub = item.subtitle;
     if (sub == null) return;
     // External subtitles can only be added once the file is loaded.
@@ -403,6 +416,28 @@ class PlaybackController {
     });
   }
 
+  /// Subtitle files picked from the device during this session.
+  final ValueNotifier<List<ServerSubtitle>> localSubtitles = ValueNotifier(const []);
+  final Map<String, String> _localTexts = {};
+  String? _localKey;
+
+  /// Loads a subtitle file from the device (srt/ass/ssa/vtt).
+  Future<void> loadLocalSubtitle(String name, List<int> bytes) async {
+    final text = decodeSubtitle(bytes);
+    final id = 'local:$name';
+    _localTexts[id] = text;
+    if (!localSubtitles.value.any((s) => s.id == id)) {
+      localSubtitles.value = [...localSubtitles.value, ServerSubtitle(id: id, label: name, source: 'Trên máy')];
+    }
+    await _loadServerSubtitle(SubtitleText(key: current.key, id: id, label: name, text: text));
+  }
+
+  Future<void> selectLocalSubtitle(ServerSubtitle sub) async {
+    final text = _localTexts[sub.id];
+    if (text == null) return;
+    await _loadServerSubtitle(SubtitleText(key: current.key, id: sub.id, label: sub.label, text: text));
+  }
+
   /// Picks a server subtitle (the page fetches it and sends it back).
   Future<void> selectServerSubtitle(ServerSubtitle sub) async {
     final link = page;
@@ -427,9 +462,32 @@ class PlaybackController {
   /// the same with its subtitle position calculator). Styled ASS keeps its own
   /// positioning, as mpv only moves it with sub-ass-override.
   Future<void> raiseSubtitles(bool raised) async {
+    _subtitlesRaised = raised;
+    await _applySubtitlePosition();
+  }
+
+  bool _subtitlesRaised = true;
+  double _hiddenBottom = 0;
+
+  /// Part of the frame (0..0.45 of its height) cut off below the screen in
+  /// "fill" mode. libass draws subtitles inside the frame, so without this
+  /// they slide off the bottom of the screen when the picture is zoomed.
+  Future<void> setFrameCrop(double hiddenBottom) async {
+    final v = hiddenBottom.clamp(0.0, 0.45);
+    if ((v - _hiddenBottom).abs() < 0.005) return;
+    _hiddenBottom = v;
+    await _applySubtitlePosition();
+  }
+
+  Future<void> _applySubtitlePosition() async {
     if (_disposed) return;
     final native = player.platform;
-    if (native is NativePlayer) await native.setProperty('sub-pos', raised ? '78' : '100');
+    if (native is! NativePlayer) return;
+    // sub-pos: 100 = bottom edge of the frame. Keep the line inside the
+    // visible part, and above the controls while they are shown.
+    final visibleBottom = 100 * (1 - _hiddenBottom) - (_hiddenBottom > 0 ? 3 : 0);
+    final pos = (_subtitlesRaised ? visibleBottom - 22 : visibleBottom).clamp(0, 100).round();
+    await native.setProperty('sub-pos', '$pos');
   }
 
   Future<void> seekRelative(Duration delta) async {
@@ -466,6 +524,7 @@ class PlaybackController {
     error.dispose();
     recovering.dispose();
     serverSubtitles.dispose();
+    localSubtitles.dispose();
     search.dispose();
     serverSubtitleId.dispose();
     notice.dispose();
@@ -503,4 +562,29 @@ class SubtitleSearchState {
   final String languages;
 
   bool get done => key != null && !loading;
+}
+
+/// Subtitle files come in UTF-8 (with or without BOM), UTF-16 or older
+/// single-byte encodings; mpv needs UTF-8 text.
+String decodeSubtitle(List<int> bytes) {
+  if (bytes.length >= 2) {
+    final le = bytes[0] == 0xFF && bytes[1] == 0xFE;
+    final be = bytes[0] == 0xFE && bytes[1] == 0xFF;
+    if (le || be) {
+      final units = <int>[];
+      for (var i = 2; i + 1 < bytes.length; i += 2) {
+        units.add(le ? bytes[i] | (bytes[i + 1] << 8) : (bytes[i] << 8) | bytes[i + 1]);
+      }
+      return String.fromCharCodes(units);
+    }
+  }
+  var start = 0;
+  if (bytes.length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) start = 3;
+  try {
+    return utf8.decode(bytes.sublist(start));
+  } on FormatException {
+    // Not UTF-8: Latin-1 keeps the bytes; old Vietnamese code pages (VNI,
+    // TCVN3) need converting to Unicode before use.
+    return latin1.decode(bytes.sublist(start));
+  }
 }

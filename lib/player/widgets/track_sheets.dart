@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:material_ui/material_ui.dart';
@@ -102,6 +103,31 @@ class _SubtitleSheetState extends State<_SubtitleSheet> {
 
   String _sourceOf(ServerSubtitle s) => _sourceNames[s.source] ?? s.source ?? 'Server';
 
+  static const _subtitleExtensions = {'srt', 'ass', 'ssa', 'vtt', 'sub', 'txt'};
+
+  /// Subtitle file from the device (Downloads, a USB drive…).
+  Future<void> _pickLocal() async {
+    try {
+      final files = await FilePicker.pickFiles(dialogTitle: 'Chọn file phụ đề');
+      if (files.isEmpty) return;
+      final f = files.first;
+      final ext = f.name.contains('.') ? f.name.split('.').last.toLowerCase() : '';
+      if (!_subtitleExtensions.contains(ext)) {
+        c.say('Chỉ hỗ trợ file .srt, .ass, .ssa, .vtt');
+        return;
+      }
+      final bytes = await f.readAsBytes();
+      if (bytes.isEmpty || bytes.length > 8 * 1024 * 1024) {
+        c.say('File phụ đề rỗng hoặc quá lớn');
+        return;
+      }
+      if (mounted) setState(() => _filter = _all);
+      await c.loadLocalSubtitle(f.name, bytes);
+    } catch (e) {
+      c.say('Không mở được file: $e');
+    }
+  }
+
   Future<void> _search() async {
     final picked = await showDialog<String>(
       context: context,
@@ -117,7 +143,7 @@ class _SubtitleSheetState extends State<_SubtitleSheet> {
     final player = c.player;
     final text = Theme.of(context).textTheme;
     return ListenableBuilder(
-      listenable: Listenable.merge([c.active, c.serverSubtitles, c.serverSubtitleId, c.search]),
+      listenable: Listenable.merge([c.active, c.serverSubtitles, c.serverSubtitleId, c.search, c.localSubtitles]),
       builder: (context, _) {
         final selected = c.active.value.subtitle;
         final serverOn = c.serverSubtitleId.value != null && selected == c.serverSubtitleTrackId;
@@ -126,6 +152,7 @@ class _SubtitleSheetState extends State<_SubtitleSheet> {
             .toList();
         final search = c.search.value;
         final server = [
+          ...c.localSubtitles.value,
           ...c.serverSubtitles.value,
           ...search.results.where((r) => !c.serverSubtitles.value.any((s) => s.id == r.id)),
         ];
@@ -154,6 +181,15 @@ class _SubtitleSheetState extends State<_SubtitleSheet> {
                   chip('Tất cả', _all),
                   if (embedded.isNotEmpty) chip('Trong file', _file),
                   for (final src in sources) chip(src, src),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ActionChip(
+                      avatar: const Icon(IconsaxPlusLinear.folder_open, size: 16),
+                      label: const Text('Từ máy'),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: _pickLocal,
+                    ),
+                  ),
                   ActionChip(
                     avatar: const Icon(IconsaxPlusLinear.search_normal_1, size: 16),
                     label: Text(search.done ? 'Tìm lại' : 'Tìm online'),
@@ -221,7 +257,7 @@ class _SubtitleSheetState extends State<_SubtitleSheet> {
                       ? () {}
                       : () {
                           Navigator.pop(context);
-                          c.selectServerSubtitle(s);
+                          s.id.startsWith('local:') ? c.selectLocalSubtitle(s) : c.selectServerSubtitle(s);
                         },
                 ),
             const Divider(height: 12),

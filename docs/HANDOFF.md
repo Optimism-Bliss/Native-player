@@ -57,6 +57,12 @@ Chưa kiểm thử: Windows và Android trên máy thật, âm thanh (VPS không
 
 Chạm: hiện/ẩn điều khiển. Chạm đúp trái/phải: ±10 giây, giữa: phát/dừng. Vuốt dọc nửa trái: độ sáng (chỉ cửa sổ app, trả lại khi thoát player); nửa phải: âm lượng media. Hai ngón: chụm để Lấp đầy / Vừa màn hình. Âm lượng và độ sáng dùng code Android riêng trong `MainActivity.kt` (kênh `torboxstrm/intent`), không dùng plugin: `volume_controller` làm sập app trên Linux không có thiết bị âm thanh. Chưa kiểm thử trên máy thật.
 
+## 1.1.0
+
+- **Phụ đề tụt khi "Lấp đầy":** libass vẽ phụ đề trong khung hình, nên khi khung bị phóng to và cắt đáy, phụ đề rơi khỏi màn hình. `PlayerScreen._syncFrameCrop()` tính phần đáy bị cắt (tỉ lệ video so với màn hình) và `PlaybackController.setFrameCrop()` đặt `sub-pos` trong vùng còn thấy. Đã kiểm thử trên Linux ở cửa sổ 2,29:1.
+- **Phụ đề từ máy:** chip "Từ máy" trong bảng Phụ đề (`file_picker`), nhận .srt/.ass/.ssa/.vtt, tự đoán mã hoá (UTF-8, UTF-16, Latin-1; VNI/TCVN3 chưa chuyển đổi). Gắn với file đang xem, nạp lại sau khi player tự mở lại. Chưa thử trên Android (hộp chọn file của hệ thống).
+- **Tốc độ phát:** nút đồng hồ cạnh nút tỉ lệ khung hình, 0.5×–2×, mặc định 1× cho mỗi phiên; mpv giữ cao độ giọng. Đã thử 2× trên Linux.
+
 ## Làm sau
 
 Từ bản rà soát mô tả bàn giao ban đầu:

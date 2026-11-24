@@ -77,6 +77,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _seekFlashTimer?.cancel();
     _focus.dispose();
     _levelTimer?.cancel();
+    _paramsSub?.cancel();
     _level.dispose();
     // Brightness was only changed for this screen: hand it back to the system.
     if (_brightnessChanged) DeviceControls.setBrightness(null).catchError((_) {});
@@ -226,6 +227,47 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
+  static const _rates = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+  static String _rateLabel(double r) => r == r.roundToDouble() ? r.toStringAsFixed(0) : '$r';
+
+  /// Playback speed via mpv (pitch is kept by mpv's audio-pitch-correction).
+  Future<void> _pickSpeed() async {
+    _restartHideTimer();
+    final current = c.player.state.rate;
+    final picked = await showModalBottomSheet<double>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Tốc độ phát', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final r in _rates)
+                    ChoiceChip(
+                      label: Text(r == 1 ? '1× (bình thường)' : '${_rateLabel(r)}×'),
+                      selected: (current - r).abs() < 0.01,
+                      onSelected: (_) => Navigator.pop(context, r),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked != null) {
+      await c.player.setRate(picked);
+      c.say('Tốc độ ${_rateLabel(picked)}×');
+    }
+  }
+
   Future<void> _pickFit() async {
     _restartHideTimer();
     final picked = await showModalBottomSheet<VideoFit>(
@@ -352,7 +394,29 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
+  StreamSubscription<VideoParams>? _paramsSub;
+
+  /// In "fill" mode the frame is wider/taller than the screen; tell the
+  /// controller how much of it is cut off below so subtitles stay visible.
+  void _syncFrameCrop() {
+    if (!mounted || !c.initialized) return;
+    final screen = MediaQuery.sizeOf(context);
+    final v = c.player.state.videoParams;
+    final w = (v.dw ?? v.w ?? 0).toDouble();
+    final h = (v.dh ?? v.h ?? 0).toDouble();
+    var hidden = 0.0;
+    if (_fit == VideoFit.cover && w > 0 && h > 0 && screen.width > 0 && screen.height > 0) {
+      final videoAspect = (v.aspect != null && v.aspect! > 0) ? v.aspect! : w / h;
+      final screenAspect = screen.width / screen.height;
+      // Video narrower than the screen: width fills, top and bottom are cut.
+      if (videoAspect < screenAspect) hidden = (1 - videoAspect / screenAspect) / 2;
+    }
+    c.setFrameCrop(hidden);
+  }
+
   Widget _buildPlayer(BuildContext context) {
+    _paramsSub ??= c.player.stream.videoParams.listen((_) => _syncFrameCrop());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncFrameCrop());
     return MouseRegion(
       cursor: _overlay ? SystemMouseCursors.basic : SystemMouseCursors.none,
       onHover: _touch ? null : (_) => _showOverlay(),
@@ -632,6 +696,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     const Spacer(),
                     if (!_touch && !phone)
                       _VolumeSlider(player: c.player, onMute: _toggleMute, onChanged: _restartHideTimer),
+                    StreamBuilder<double>(
+                      stream: c.player.stream.rate,
+                      initialData: c.player.state.rate,
+                      builder: (context, snap) {
+                        final rate = snap.data ?? 1;
+                        return rate == 1
+                            ? IconButton(
+                                tooltip: 'Tốc độ phát',
+                                onPressed: _pickSpeed,
+                                icon: const Icon(IconsaxPlusLinear.timer_1),
+                              )
+                            : TextButton(onPressed: _pickSpeed, child: Text('${_rateLabel(rate)}×'));
+                      },
+                    ),
                     IconButton(
                       tooltip: 'Tỉ lệ khung hình: ${_fit.label}',
                       onPressed: _pickFit,
