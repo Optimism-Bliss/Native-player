@@ -58,6 +58,17 @@ class PlayerHost {
           : const VideoControllerConfiguration(enableHardwareAcceleration: true),
     );
     final host = PlayerHost._(player, video);
+    // libmpv's own warnings and errors (video output, decoder, network) into the app log: a black
+    // picture with sound, or a stall, is explained there. Repeats are dropped, at most 300 lines a run.
+    var mpvLines = 0;
+    String? lastMpv;
+    player.stream.log.listen((l) {
+      final line = 'mpv ${l.level} ${l.prefix}: ${l.text.trim()}';
+      if (line == lastMpv || mpvLines >= 300) return;
+      lastMpv = line;
+      mpvLines++;
+      appLog(line);
+    });
     final native = player.platform;
     if (native is NativePlayer) {
       // Same network/cache tuning Fladder uses for direct HTTP playback.
