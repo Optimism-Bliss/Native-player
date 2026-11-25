@@ -113,6 +113,12 @@ Có hình sau 2,7 s (tập đang xem dở, đã xin sẵn link) / 6,0 s / 9,8 s 
 - Khi tập đang xem qua 70%, trang xin sẵn link và phụ đề cho tập kế trong hàng đợi.
 - Còn cần log server (`mở /s … ms=…`, có `qua proxy VPS` không) để biết 6–15 s còn lại nằm ở TorBox, CDN hay mpv.
 
+## Mã máy chủ (ẩn địa chỉ server)
+
+- Admin: Cài đặt → Tài khoản → "📱 Mã máy chủ cho app" (`GET /api/admin/app-code`) hiện mã `TBS1-…` và QR (`torboxstrm://connect?c=…`). Mã dựng từ `STRM_BASE_URL`.
+- Cấu trúc mã: base32 Crockford của `[1][địa chỉ][CRC-16/CCITT]`, XOR khoá cố định (`lib/connect_code.dart`, `src/appcode.rs`, có test vector chung). Mã chỉ làm rối địa chỉ, **không phải mã hoá**; ai cố tình vẫn tìm ra được, vì app phải kết nối tới địa chỉ đó và chứng chỉ HTTPS được công bố công khai.
+- App: ô "Địa chỉ hoặc mã máy chủ" nhận mã (gõ thường, dấu cách, nhầm O/0, I/1 vẫn đọc được; sai một ký tự thì báo lỗi). QR mở app qua intent filter `torboxstrm://connect`. Đã thêm bằng mã thì app không hiện địa chỉ: thanh công cụ, menu, lỗi và tiêu đề cửa sổ web đều hiện "Máy chủ riêng"; nhật ký thay host bằng `[máy chủ]`.
+
 ## Làm sau
 
 Từ bản rà soát mô tả bàn giao ban đầu:

@@ -335,7 +335,7 @@ class TvReceiver {
     _active = true;
     final device = body['device'];
     if (device is String && device.isNotEmpty) lastPhone.value = device;
-    appLog('tv: play ${request.queue[request.index].title} from ${origin.host}');
+    appLog('tv: play ${request.queue[request.index].title}');
     unawaited(openPlayer(request));
     return _json(req.response, {'ok': true});
   }

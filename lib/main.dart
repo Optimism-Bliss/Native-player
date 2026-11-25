@@ -10,10 +10,12 @@ import 'package:webview_all_windows/webview_all_windows.dart';
 
 import 'screens/browser_screen.dart';
 import 'screens/connect_screen.dart';
+import 'connect_code.dart';
 import 'settings.dart';
 import 'theme.dart';
 import 'util/fullscreen.dart';
 import 'tv/tv_home.dart';
+import 'util/links.dart';
 import 'util/log.dart';
 import 'util/tv_mode.dart';
 
@@ -51,7 +53,19 @@ Future<void> _start() async {
   }
   if (Platform.isWindows) await prepareWindowsWebView();
   await detectTv();
-  final server = await ServerStore.load();
+  await AppLinks.init();
+  var server = await ServerStore.load();
+  // opened from a server code QR (torboxstrm://connect?c=...) before any server was set
+  if (server == null) {
+    for (final l in AppLinks.take((l) => codeFromLink(l) != null)) {
+      final code = codeFromLink(l)!;
+      final s = decodeServerCode(code);
+      if (s != null) {
+        await ServerStore.save(s, viaCode: encodeServerCode(s));
+        server = s;
+      }
+    }
+  }
   runApp(TorboxStrmApp(server: server));
 }
 

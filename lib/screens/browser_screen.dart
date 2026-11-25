@@ -14,6 +14,7 @@ import 'package:window_manager/window_manager.dart';
 import '../bridge.dart';
 import '../player/playback_controller.dart';
 import '../player/player_screen.dart';
+import '../connect_code.dart';
 import '../settings.dart';
 import '../tv/protocol.dart';
 import '../tv/remote_screen.dart';
@@ -22,6 +23,7 @@ import '../util/fullscreen.dart';
 import '../util/tv_mode.dart';
 import '../update/update_ui.dart';
 import '../update/updater.dart';
+import '../util/links.dart';
 import '../util/log.dart';
 import 'connect_screen.dart';
 import 'web_window.dart';
@@ -92,17 +94,41 @@ class _BrowserScreenState extends State<BrowserScreen> {
     final tv = await PairedTv.load();
     if (mounted) setState(() => _tv = tv);
     if (!Platform.isAndroid) return;
-    // pairing links: torboxstrm://pair?... from the TV's QR page
-    _intentChannel.setMethodCallHandler((call) async {
-      if (call.method == 'link' && call.arguments is String) await _pairFromLink(call.arguments as String);
-      return null;
-    });
-    try {
-      final link = await _intentChannel.invokeMethod<String>('initialLink');
-      if (link != null) await _pairFromLink(link);
-    } catch (e) {
-      appLog('initial link: $e');
+    // pairing links (torboxstrm://pair?... from the TV's QR page) and server
+    // codes (torboxstrm://connect?c=... from the server's QR) while running
+    _links = AppLinks.stream.listen(_onLink);
+    for (final l in AppLinks.take((l) => PairLink.parse(l) != null)) {
+      await _pairFromLink(l);
     }
+  }
+
+  StreamSubscription<String>? _links;
+
+  Future<void> _onLink(String raw) async {
+    if (PairLink.parse(raw) != null) return _pairFromLink(raw);
+    final code = codeFromLink(raw);
+    final server = code == null ? null : decodeServerCode(code);
+    if (server == null || !mounted) return;
+    if (server.origin == widget.server.origin) {
+      await ServerStore.save(widget.server, viaCode: code);
+      if (mounted) setState(() {});
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Đổi máy chủ?'),
+        content: const Text('Mã vừa quét là của một máy chủ khác. Chuyển sang máy chủ đó?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Không')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Chuyển')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await ServerStore.save(server, viaCode: code);
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => BrowserScreen(server: server)));
   }
 
   Future<void> _pairFromLink(String raw) async {
@@ -370,7 +396,11 @@ class _BrowserScreenState extends State<BrowserScreen> {
           onWebResourceError: (e) {
             if (e.isForMainFrame == false || !mounted) return;
             appLog('page error ${e.errorCode}: ${e.description}');
-            setState(() => _loadError = e.description.isEmpty ? 'Lỗi tải trang (${e.errorCode})' : e.description);
+            setState(
+              () => _loadError = e.description.isEmpty
+                  ? 'Lỗi tải trang (${e.errorCode})'
+                  : ServerStore.redact(e.description),
+            );
           },
         ),
       );
@@ -499,6 +529,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
   @override
   void dispose() {
+    _links?.cancel();
     _lifecycle?.dispose();
     _window?.isOpen.removeListener(_onWindowOpenChanged);
     _window?.close();
@@ -604,7 +635,11 @@ class _BrowserScreenState extends State<BrowserScreen> {
   Future<void> _changeServer() async {
     await ServerStore.clear();
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => ConnectScreen(initial: widget.server)));
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => ConnectScreen(initial: widget.server, initialCode: ServerStore.code),
+      ),
+    );
   }
 
   Future<void> _signOut() async {
@@ -649,7 +684,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
           children: [
             ListTile(
               leading: Icon(widget.server.scheme == 'https' ? IconsaxPlusLinear.lock_1 : IconsaxPlusLinear.unlock),
-              title: Text(widget.server.host),
+              title: Text(ServerStore.label(widget.server)),
               subtitle: Text(_version.isEmpty ? 'TorBox STRM' : 'TorBox STRM $_version'),
             ),
             const Divider(height: 1),
@@ -761,7 +796,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
                                 Icon(IconsaxPlusLinear.wifi_square, size: 48, color: scheme.error),
                                 const SizedBox(height: 12),
                                 Text(
-                                  'Không tải được ${widget.server.host}',
+                                  'Không tải được ${ServerStore.label(widget.server)}',
                                   style: Theme.of(context).textTheme.titleMedium,
                                 ),
                                 const SizedBox(height: 4),
@@ -866,7 +901,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              widget.server.host,
+              ServerStore.label(widget.server),
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelLarge,
             ),

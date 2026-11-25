@@ -68,7 +68,7 @@ class MainActivity : FlutterActivity() {
 
     private fun pairLink(intent: Intent?): String? {
         val data = intent?.data ?: return null
-        return if (data.scheme == "torboxstrm" && data.host == "pair") data.toString() else null
+        return if (data.scheme == "torboxstrm" && (data.host == "pair" || data.host == "connect")) data.toString() else null
     }
 
     private fun isTv(): Boolean {

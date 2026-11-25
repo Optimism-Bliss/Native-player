@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_all/webview_all.dart' show WebViewJavaScriptCall, WebViewJavaScriptWorld;
 
 import '../bridge.dart';
+import '../settings.dart';
 import '../util/log.dart';
 
 /// Windows: the web UI in its own native WebView2 window instead of inside the
@@ -97,6 +98,8 @@ class WebWindow {
         windowWidth: 1280,
         windowHeight: 800,
         title: 'TorBox STRM',
+        // added with a server code: keep the address out of the title bar
+        titleBar: TitleBarOptions(showHost: !ServerStore.hidden),
         openMaximized: true,
         brightness: Brightness.dark,
         windows: WindowsWebviewOptions(userDataFolder: _profile, denyCameraAndMicrophone: true),

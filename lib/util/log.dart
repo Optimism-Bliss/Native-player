@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../settings.dart';
 import 'fullscreen.dart';
 
 /// Android: set at start-up (app files folder) so the log can be read in the app.
@@ -29,6 +30,7 @@ String readLogTail([int lines = 200]) {
 }
 
 void appLog(String message) {
+  message = ServerStore.redact(message);
   debugPrint(message);
   if (!isDesktop && androidLogDir == null) return;
   try {

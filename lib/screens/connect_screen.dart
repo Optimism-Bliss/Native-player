@@ -1,36 +1,71 @@
+import 'dart:async';
+
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../connect_code.dart';
 import '../settings.dart';
+import '../util/links.dart';
 import 'browser_screen.dart';
 
 /// First run (or "change server"): ask for the TorBox STRM address and check
 /// it answers `/health`. Login itself happens in the web UI afterwards.
 class ConnectScreen extends StatefulWidget {
-  const ConnectScreen({super.key, this.initial});
+  const ConnectScreen({super.key, this.initial, this.initialCode});
   final Uri? initial;
+
+  /// The server code the current server was added with (its address stays hidden).
+  final String? initialCode;
 
   @override
   State<ConnectScreen> createState() => _ConnectScreenState();
 }
 
 class _ConnectScreenState extends State<ConnectScreen> {
-  late final TextEditingController _url = TextEditingController(text: widget.initial?.toString() ?? '');
+  late final TextEditingController _url = TextEditingController(
+    text: widget.initialCode ?? widget.initial?.toString() ?? '',
+  );
+  StreamSubscription<String>? _links;
+
+  @override
+  void initState() {
+    super.initState();
+    // opened from the server's QR code (camera -> torboxstrm://connect?c=...)
+    _links = AppLinks.stream.listen(_fromLink);
+    for (final l in AppLinks.take((l) => codeFromLink(l) != null)) {
+      _fromLink(l);
+    }
+  }
+
+  void _fromLink(String raw) {
+    final code = codeFromLink(raw);
+    if (code == null || !mounted) return;
+    _url.text = code;
+    _connect();
+  }
+
   bool _busy = false;
   String? _error;
 
   @override
   void dispose() {
+    _links?.cancel();
     _url.dispose();
     super.dispose();
   }
 
   Future<void> _connect() async {
-    final server = ServerStore.normalize(_url.text);
+    final viaCode = looksLikeServerCode(_url.text);
+    final server = viaCode ? decodeServerCode(_url.text) : ServerStore.normalize(_url.text);
     if (server == null) {
-      setState(() => _error = 'Địa chỉ không hợp lệ. Ví dụ: https://media.example.com');
+      setState(
+        () => _error = viaCode
+            ? 'Mã máy chủ không đúng — kiểm tra lại từng ký tự (hoặc quét QR).'
+            : 'Địa chỉ không hợp lệ. Ví dụ: https://media.example.com',
+      );
       return;
     }
+    final code = viaCode ? encodeServerCode(server) : null;
     setState(() {
       _busy = true;
       _error = null;
@@ -40,7 +75,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
     setState(() => _busy = false);
     switch (result) {
       case ProbeResult.ok:
-        await ServerStore.save(server);
+        await ServerStore.save(server, viaCode: code);
         if (!mounted) return;
         Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => BrowserScreen(server: server)));
       case ProbeResult.notTorboxStrm:
@@ -48,7 +83,10 @@ class _ConnectScreenState extends State<ConnectScreen> {
       case ProbeResult.certificate:
         setState(() => _error = 'Chứng chỉ HTTPS của máy chủ không hợp lệ.');
       case ProbeResult.unreachable:
-        setState(() => _error = 'Không kết nối được tới ${server.host}. Kiểm tra địa chỉ và mạng.');
+        setState(
+          () => _error =
+              'Không kết nối được tới ${viaCode ? 'máy chủ' : server.host}. Kiểm tra ${viaCode ? 'mã' : 'địa chỉ'} và mạng.',
+        );
     }
   }
 
@@ -56,6 +94,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final insecure = _url.text.trim().startsWith('http://');
+    final isCode = looksLikeServerCode(_url.text);
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
@@ -74,7 +113,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Nhập địa chỉ máy chủ TorBox STRM. Bạn sẽ đăng nhập bằng tài khoản của máy chủ ở bước tiếp theo.',
+                  'Nhập địa chỉ hoặc mã máy chủ (TBS1-…) TorBox STRM. Bạn sẽ đăng nhập bằng tài khoản của máy chủ ở bước tiếp theo.',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
@@ -89,9 +128,9 @@ class _ConnectScreenState extends State<ConnectScreen> {
                   onChanged: (_) => setState(() {}),
                   onSubmitted: (_) => _connect(),
                   decoration: InputDecoration(
-                    labelText: 'Địa chỉ máy chủ',
-                    hintText: 'https://media.example.com',
-                    prefixIcon: const Icon(IconsaxPlusLinear.global),
+                    labelText: 'Địa chỉ hoặc mã máy chủ',
+                    hintText: 'https://media.example.com hoặc TBS1-…',
+                    prefixIcon: Icon(isCode ? IconsaxPlusLinear.key : IconsaxPlusLinear.global),
                     border: const OutlineInputBorder(),
                     errorText: _error,
                     errorMaxLines: 3,
