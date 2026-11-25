@@ -17,5 +17,11 @@ void main() {
     expect(appLinkFromScan('tbs1-am11-e9g6'), 'torboxstrm://connect?c=TBS1-AM11-E9G6');
     expect(appLinkFromScan('https://example.com/other'), isNull);
     expect(appLinkFromScan('hello'), isNull);
+    // TV start screen QR: the TV's own pairing page on the LAN
+    final pair = appLinkFromScan('http://192.168.88.105:47800/pair?c=238461');
+    expect(pair, startsWith('torboxstrm://pair?'));
+    expect(Uri.parse(pair!).queryParameters, containsPair('h', '192.168.88.105'));
+    expect(Uri.parse(pair).queryParameters, containsPair('c', '238461'));
+    expect(appLinkFromScan('http://192.168.88.105:47800/pair?c=12'), isNull);
   });
 }

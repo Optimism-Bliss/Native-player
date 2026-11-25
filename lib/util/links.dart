@@ -62,6 +62,17 @@ String? appLinkFromScan(String raw) {
   final t = raw.trim();
   final u = Uri.tryParse(t);
   if (u != null && u.scheme == 'torboxstrm') return t;
+  // the TV start screen's QR: http://<TV LAN address>:<port>/pair?c=<6 digits>
+  if (u != null &&
+      u.scheme == 'http' &&
+      u.path == '/pair' &&
+      RegExp(r'^\d{6}$').hasMatch(u.queryParameters['c'] ?? '')) {
+    return Uri(
+      scheme: 'torboxstrm',
+      host: 'pair',
+      queryParameters: {'h': u.host, 'p': '${u.hasPort ? u.port : 47800}', 'c': u.queryParameters['c']!, 'n': 'TV'},
+    ).toString();
+  }
   if (u != null && (u.scheme == 'https' || u.scheme == 'http') && u.path == '/device') {
     final c = deviceLoginCode('torboxstrm://device?c=${u.queryParameters['c'] ?? ''}');
     if (c != null) return 'torboxstrm://device?c=$c';
