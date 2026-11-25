@@ -57,6 +57,8 @@ class MainActivity : FlutterActivity() {
                     "key" -> result.success(pressKey(call.argument<String>("key") ?: ""))
                     // start-up log line: free RAM and why the previous run ended (killed for memory, crash…)
                     "startInfo" -> result.success(startInfo())
+                    // frame-rate matching on TVs: a display mode whose refresh rate fits the film (0 = default)
+                    "frameRate" -> result.success(frameRate(call.argument<Double>("fps") ?: 0.0))
                     "getBrightness" -> result.success(brightness())
                     "setBrightness" -> {
                         setBrightness(call.argument<Double>("value"))
@@ -96,6 +98,35 @@ class MainActivity : FlutterActivity() {
             dispatchKeyEvent(KeyEvent(t, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, code, 0))
         }
         return true
+    }
+
+    /// Picks the display mode with the current resolution whose refresh rate is a whole multiple of
+    /// [fps] (23.976 → 23.976/24/47.95/48…, 25 → 50, 29.97 → 59.94), lowest first, and asks the window
+    /// for it (Android TV switches the HDMI mode; the screen may go dark for a second). 0 restores the
+    /// default mode. Returns the refresh rate expected afterwards, or null when nothing fits.
+    private fun frameRate(fps: Double): Double? {
+        @Suppress("DEPRECATION")
+        val display = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display else windowManager.defaultDisplay)
+            ?: return null
+        val attrs = window.attributes
+        if (fps <= 0.0) {
+            attrs.preferredDisplayModeId = 0
+            window.attributes = attrs
+            return display.supportedModes.firstOrNull { it.modeId == display.mode.modeId }?.refreshRate?.toDouble()
+        }
+        val current = display.mode
+        val best = display.supportedModes
+            .filter { it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight }
+            .filter {
+                val k = it.refreshRate / fps
+                val n = Math.round(k)
+                n >= 1 && Math.abs(k - n) < 0.005 * n
+            }
+            .minByOrNull { it.refreshRate } ?: return null
+        if (best.modeId == current.modeId) return best.refreshRate.toDouble()
+        attrs.preferredDisplayModeId = best.modeId
+        window.attributes = attrs
+        return best.refreshRate.toDouble()
     }
 
     private fun startInfo(): String {

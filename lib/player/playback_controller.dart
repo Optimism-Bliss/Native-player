@@ -7,6 +7,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import '../bridge.dart';
 import '../util/tv_mode.dart';
+import 'tv_playback_prefs.dart';
 import '../util/log.dart';
 import '../util/format.dart';
 
@@ -48,9 +49,18 @@ class PlayerHost {
         logLevel: MPVLogLevel.warn,
       ),
     );
+    final zeroCopy = TvPlaybackPrefs.zeroCopy;
+    // media_kit already runs mpv with gpu-context=android / opengl-es; its default hwdec (auto-safe)
+    // ends up as mediacodec-copy. Zero-copy asks for mediacodec first, as mpv-android does.
     final video = VideoController(
       player,
-      configuration: const VideoControllerConfiguration(enableHardwareAcceleration: true),
+      configuration: zeroCopy
+          ? const VideoControllerConfiguration(hwdec: 'mediacodec,mediacodec-copy')
+          : const VideoControllerConfiguration(enableHardwareAcceleration: true),
+    );
+    appLog(
+      'player: ${zeroCopy ? 'zero-copy decoding (mediacodec)' : 'gpu output'}'
+      '${TvPlaybackPrefs.matchFrameRate ? ', frame-rate matching' : ''}',
     );
     final host = PlayerHost._(player, video);
     // libmpv's own warnings and errors (video output, decoder, network) into the app log: a black
@@ -75,6 +85,8 @@ class PlayerHost {
       await native.setProperty('demuxer-max-back-bytes', isTvDevice ? '16M' : '50M');
       await native.setProperty('network-timeout', '60');
       await native.setProperty('stream-buffer-size', '4M');
+      final hz = TvPlaybackPrefs.displayRefreshRate();
+      if (hz > 0) await native.setProperty('display-fps-override', hz.toStringAsFixed(3));
       if (isTvDevice) {
         // TV boxes have weak GPUs (Mi Box S: Mali-450): mpv's light rendering, as its "fast" profile.
         // High-quality scalers, debanding and dithering cost GPU time and look the same on a TV.
@@ -336,6 +348,7 @@ class PlaybackController {
       _playingLogged = true;
       appLog('play: picture after $_t');
       unawaited(_logStream());
+      unawaited(_matchFrameRate());
     } else if (_playingLogged) {
       if (buffering) {
         _waitSince ??= DateTime.now();
@@ -621,8 +634,37 @@ class PlaybackController {
     onProgress(current.key, pos, dur);
   }
 
+  bool _frameRateChanged = false;
+
+  /// Frame-rate matching (TV setting): once the film's rate is known, switch the display to a
+  /// fitting mode and pause while it settles (the screen may go dark for about a second).
+  Future<void> _matchFrameRate() async {
+    if (!TvPlaybackPrefs.matchFrameRate || _disposed) return;
+    final fps = double.tryParse(await _prop('container-fps')) ?? double.tryParse(await _prop('estimated-vf-fps')) ?? 0;
+    if (fps < 10 || fps > 121) return;
+    final before = TvPlaybackPrefs.displayRefreshRate();
+    final hz = await TvPlaybackPrefs.requestFrameRate(fps);
+    appLog(
+      'frame rate: film ${fps.toStringAsFixed(3)} fps, display ${before.toStringAsFixed(2)} -> ${hz?.toStringAsFixed(2) ?? 'unchanged'} Hz',
+    );
+    if (hz == null || (hz - before).abs() < 0.01 || _disposed) return;
+    _frameRateChanged = true;
+    final n = player.platform;
+    if (n is NativePlayer) await n.setProperty('display-fps-override', hz.toStringAsFixed(3));
+    final wasPlaying = player.state.playing;
+    await player.pause();
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (wasPlaying && !_disposed) await player.play();
+  }
+
   Future<void> dispose() async {
     if (_disposed) return;
+    if (_frameRateChanged) {
+      _frameRateChanged = false;
+      final hz = await TvPlaybackPrefs.requestFrameRate(0);
+      final n = player.platform;
+      if (hz != null && n is NativePlayer) await n.setProperty('display-fps-override', hz.toStringAsFixed(3));
+    }
     reportProgress(force: true);
     _disposed = true;
     _progressTimer?.cancel();

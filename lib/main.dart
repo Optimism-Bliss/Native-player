@@ -20,6 +20,7 @@ import 'util/fullscreen.dart';
 import 'util/links.dart';
 import 'util/log.dart';
 import 'util/tv_mode.dart';
+import 'player/tv_playback_prefs.dart';
 
 Future<void> main() async {
   runZonedGuarded(_start, (error, stack) => appLog('uncaught: $error\n$stack'));
@@ -60,6 +61,7 @@ Future<void> _start() async {
   }
   if (Platform.isWindows) await prepareWindowsWebView();
   await detectTv();
+  await TvPlaybackPrefs.load();
   if (Platform.isAndroid) {
     // which build runs where, how much RAM is free, and why the previous run ended
     // (a TV box killed for memory leaves no error of its own in this log)

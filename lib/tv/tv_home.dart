@@ -9,6 +9,7 @@ import '../player/playback_controller.dart';
 import '../player/player_screen.dart';
 import '../screens/browser_screen.dart';
 import '../screens/connect_screen.dart';
+import '../player/tv_playback_prefs.dart';
 import '../screens/role_screen.dart';
 import '../update/update_ui.dart';
 import '../update/updater.dart';
@@ -200,6 +201,42 @@ class _TvHomeState extends State<TvHome> {
                               },
                               icon: const Icon(IconsaxPlusLinear.mobile),
                               label: const Text('Dùng như điện thoại'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                await TvPlaybackPrefs.setMatchFrameRate(!TvPlaybackPrefs.matchFrameRate);
+                                if (!context.mounted) return;
+                                setState(() {});
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      TvPlaybackPrefs.matchFrameRate
+                                          ? 'Khớp tần số: màn hình chuyển theo phim (24/25/30 Hz) khi phát; có thể tối khoảng 1 giây.'
+                                          : 'Đã tắt khớp tần số màn hình.',
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(IconsaxPlusLinear.monitor),
+                              label: Text('Khớp tần số: ${TvPlaybackPrefs.matchFrameRate ? 'bật' : 'tắt'}'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                await TvPlaybackPrefs.setCompat(!TvPlaybackPrefs.compat);
+                                if (!context.mounted) return;
+                                setState(() {});
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      TvPlaybackPrefs.compat
+                                          ? 'Chế độ tương thích: chép từng khung hình (dùng khi phim không lên hình). Mở lại app để áp dụng.'
+                                          : 'Giải mã không chép khung hình (mượt hơn). Mở lại app để áp dụng.',
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(IconsaxPlusLinear.cpu),
+                              label: Text('Tương thích: ${TvPlaybackPrefs.compat ? 'bật' : 'tắt'}'),
                             ),
                             OutlinedButton.icon(
                               onPressed: _rx.newCode,
