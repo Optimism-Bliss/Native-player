@@ -54,7 +54,6 @@
         <activity
             android:name=".NativePlayerActivity"
             android:exported="false"
-            android:launchMode="singleTop"
             android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|screenLayout|density|uiMode|navigation"
             android:hardwareAccelerated="true" />

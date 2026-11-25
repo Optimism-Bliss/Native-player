@@ -61,8 +61,13 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "open" -> {
                     val args = call.arguments as? Map<*, *> ?: return@setMethodCallHandler result.success(false)
-                    // a new title replaces the one playing
-                    NativePlayerBridge.activity?.command("stop", emptyMap<String, Any>())
+                    // A new title replaces the one playing. The old player may still be closing
+                    // (display mode restore) or belong to a Flutter engine Android recreated:
+                    // always start a fresh player activity, never reuse the old one.
+                    NativePlayerBridge.activity?.let { old ->
+                        NativePlayerBridge.log("native player: replacing the open player")
+                        old.command("stop", emptyMap<String, Any>())
+                    }
                     NativePlayerBridge.pendingArgs = args
                     startActivity(Intent(this, NativePlayerActivity::class.java))
                     result.success(true)
