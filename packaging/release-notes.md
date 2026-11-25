@@ -1,4 +1,13 @@
-**Có gì mới trong 1.1.3** (cần server `1.7.0-dev.10`)
+**Có gì mới trong 1.1.4** (cần server `1.7.0-dev.11`)
+- **Mã máy chủ:** admin vào Cài đặt → Tài khoản → "📱 Mã máy chủ cho app" để lấy mã `TBS1-…` và QR. Người dùng quét QR bằng camera hoặc dán mã thay cho địa chỉ; app sẽ hiện "Máy chủ riêng" thay cho domain ở mọi chỗ, nhật ký cũng che domain.
+- **🎲 Ngẫu nhiên** ở tab Phim / Series / JAV (không lẫn nhau, theo bộ lọc đang xem): xúc xắc lăn, rồi tự phát sau 5 giây.
+- **Tìm torrent thêm 6 nguồn:** Knaben, torrents-csv, LimeTorrents, RuTor, SubsPlease, Knaben JAV. Bản đã cache trên TorBox vẫn lên đầu và được kiểm nhanh hơn.
+- **Tìm bản cả mùa:** lấy thêm gói từ AIOStreams, ghi rõ "Đủ mùa (10/10)" / "Thiếu tập (4/10)" / "Chỉ 1 tập"; tự lấy chỉ chọn gói, không lấy bản lẻ một tập.
+- **Phát nhanh hơn:** mở trang phim là tải sẵn link phát và phụ đề; khi tập đang xem qua 70% thì chuẩn bị sẵn tập kế.
+- **Kết nối TV:** có nút "Tìm TV trong mạng".
+- **Cập nhật:** vẫn kiểm tra được khi GitHub giới hạn lượt hỏi (HTTP 403).
+
+**1.1.3** (cần server `1.7.0-dev.10`)
 - **Phát nhanh hơn:** mở trang phim là server xin sẵn link phát; bấm ▶ là phụ đề được tải cùng lúc; server hỏi các nguồn phụ đề song song. Nhật ký ghi thời gian từng bước để đo tiếp trên máy thật.
 - **Windows:** khi duyệt phim chỉ còn cửa sổ web; bấm ▶ thì player mở toàn màn hình, Esc quay lại web.
 - **Android:** app tự kiểm tra cập nhật 30 phút một lần và mỗi lần quay lại app. Menu của app (cập nhật, máy chủ, kết nối TV, nhật ký) mở được từ nút tài khoản 👤 ▾ trên trang web → "📱 Ứng dụng". Android cũng có mục Nhật ký.
@@ -12,7 +21,7 @@
 
 Native TorBox STRM app: browse the TorBox STRM web UI and play in a libmpv player (Fladder-style controls).
 
-**Server:** needs TorBox STRM `1.7.0-dev.10` or later for everything above (`1.7.0-dev.5`+ for the in-app player).
+**Server:** needs TorBox STRM `1.7.0-dev.11` or later for everything above (`1.7.0-dev.5`+ for the in-app player).
 
 **Updates:** the app checks this page for new releases and installs them (Android asks for permission to install apps once). Builds from 0.4.3 on are signed with a fixed release key; if you installed 0.4.0–0.4.2, uninstall it once before installing this version.
 
