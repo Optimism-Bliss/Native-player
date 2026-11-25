@@ -1,3 +1,10 @@
+**Có gì mới trong 2.0.1** (cần server `2.0.2`; cài lên cả TV lẫn điện thoại)
+- **Điện thoại thành remote TV:** menu → "Remote <tên TV&gt;": ▲ ▼ ◀ ▶ (giữ để lặp), OK, Quay lại, Màn hình chính TV, Phát / tạm dừng. TV nhận phím như remote thật ở mọi màn hình (màn hình chính, trang web, trình phát, hộp thoại). Chọn ô nhập trên TV là ô gõ chữ hiện trên cùng và bàn phím điện thoại tự bật.
+- **TV tự kiểm tra cập nhật** và có nút "Cập nhật" ở màn hình chính; hộp thoại cập nhật bấm được bằng remote (OK = Cập nhật).
+- **Duyệt đăng nhập TV một chạm** chạy đúng trên Android (link `torboxstrm://device` trước đó bị bỏ qua).
+- **Chẩn đoán giật:** nhật ký ghi mỗi lần phải chờ tải (bao lâu, tốc độ tải, bitrate phim, số giây đệm) và thông số phim khi bắt đầu phát; điện thoại xem được **nhật ký của TV** (menu → "Xem nhật ký <tên TV&gt;", có nút Chép).
+- **Bớt dừng vặt khi mạng chậm:** hết đệm thì chờ đủ 3 giây dữ liệu mới phát tiếp, tải trước tới 60 giây.
+
 **Có gì mới trong 2.0.0** (cần server `2.0.1`)
 - **Phát trên TV mượt hơn:** TV box giải mã **trực tiếp ra màn hình** (trước đây mỗi khung hình bị chép lại để vẽ bằng GPU, 4K / HEVC dễ giật). Mặc định bật trên TV; đổi ở nút "Giải mã" trên màn hình chính của TV hoặc menu app, mở lại app để áp dụng. Ở chế độ này phụ đề hiện dạng chữ thường.
 - **Đăng nhập TV bằng QR, duyệt một chạm:** TV hiện QR ngay ở trang đăng nhập; quét bằng camera điện thoại có app, app tự mở trang xác nhận, bấm **Cho phép** là TV vào.
@@ -35,7 +42,7 @@
 
 Native TorBox STRM app: browse the TorBox STRM web UI and play in a libmpv player (Fladder-style controls).
 
-**Server:** needs TorBox STRM `2.0.1` or later (`1.7.0-dev.12` for the app features before 2.0.0) for everything above (`1.7.0-dev.5`+ for the in-app player).
+**Server:** needs TorBox STRM `2.0.2` or later (`1.7.0-dev.12` for the app features before 2.0.0) for everything above (`1.7.0-dev.5`+ for the in-app player).
 
 **Updates:** the app checks this page for new releases and installs them (Android asks for permission to install apps once). Builds from 0.4.3 on are signed with a fixed release key; if you installed 0.4.0–0.4.2, uninstall it once before installing this version.
 
