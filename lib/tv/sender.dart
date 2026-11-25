@@ -147,6 +147,12 @@ class TvClient {
   /// Gives the TV this phone's server (as a server code) so it can browse and log in.
   Future<void> setServer(String code) => _call('POST', '/server', body: {'code': code});
 
+  /// Last lines of the TV's own log.
+  Future<String> log() async {
+    final d = await _call('GET', '/log', timeout: const Duration(seconds: 8));
+    return d is Map && d['log'] is String ? d['log'] as String : '';
+  }
+
   Future<TvState?> command(String action, [Map<String, Object?> extra = const {}]) async {
     final data = await _call('POST', '/cmd', body: {'action': action, ...extra});
     if (data is Map && data['ok'] != true && data['error'] is String) throw TvError(data['error'] as String);

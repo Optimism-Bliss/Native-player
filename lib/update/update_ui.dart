@@ -57,6 +57,8 @@ Future<void> checkForUpdate(BuildContext context, {bool automatic = false}) asyn
         if (automatic) TextButton(onPressed: () => Navigator.pop(context, 'skip'), child: const Text('Bỏ qua bản này')),
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Để sau')),
         FilledButton(
+          // focused at once: on a TV the remote's OK updates, arrows reach the other buttons
+          autofocus: true,
           onPressed: () => Navigator.pop(context, release.asset == null ? 'page' : 'update'),
           child: Text(release.asset == null ? 'Mở trang tải' : 'Cập nhật'),
         ),

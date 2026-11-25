@@ -10,6 +10,8 @@ import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.os.SystemClock
+import android.view.KeyEvent
 import androidx.core.content.FileProvider
 import java.io.File
 import io.flutter.embedding.android.FlutterActivity
@@ -50,6 +52,9 @@ class MainActivity : FlutterActivity() {
                         setVolume(call.argument<Double>("value") ?: 0.0)
                         result.success(null)
                     }
+                    // Phone used as the TV's remote: the key goes through the window exactly like the
+                    // real remote's (Flutter screens, the web page in the WebView, the player, dialogs).
+                    "key" -> result.success(pressKey(call.argument<String>("key") ?: ""))
                     "getBrightness" -> result.success(brightness())
                     "setBrightness" -> {
                         setBrightness(call.argument<Double>("value"))
@@ -68,7 +73,27 @@ class MainActivity : FlutterActivity() {
 
     private fun pairLink(intent: Intent?): String? {
         val data = intent?.data ?: return null
-        return if (data.scheme == "torboxstrm" && (data.host == "pair" || data.host == "connect")) data.toString() else null
+        // pair (phone ↔ TV), connect (server code), device (approve a TV's login)
+        return if (data.scheme == "torboxstrm" && data.host in setOf("pair", "connect", "device")) data.toString() else null
+    }
+
+    private fun pressKey(name: String): Boolean {
+        val code = when (name) {
+            "up" -> KeyEvent.KEYCODE_DPAD_UP
+            "down" -> KeyEvent.KEYCODE_DPAD_DOWN
+            "left" -> KeyEvent.KEYCODE_DPAD_LEFT
+            "right" -> KeyEvent.KEYCODE_DPAD_RIGHT
+            "ok" -> KeyEvent.KEYCODE_DPAD_CENTER
+            "back" -> KeyEvent.KEYCODE_BACK
+            "playpause" -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+            else -> return false
+        }
+        runOnUiThread {
+            val t = SystemClock.uptimeMillis()
+            dispatchKeyEvent(KeyEvent(t, t, KeyEvent.ACTION_DOWN, code, 0))
+            dispatchKeyEvent(KeyEvent(t, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, code, 0))
+        }
+        return true
     }
 
     private fun isTv(): Boolean {

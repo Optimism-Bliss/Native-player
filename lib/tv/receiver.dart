@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -20,7 +21,7 @@ typedef OpenPlayer = Future<void> Function(PlayRequest request);
 /// The TV side of "Play on TV": a small HTTP server on the local network.
 /// See protocol.dart for the message flow.
 class TvReceiver {
-  TvReceiver({required this.openPlayer, required this.name, this.onServer});
+  TvReceiver({required this.openPlayer, required this.name, this.onServer, this.onHome});
 
   final OpenPlayer openPlayer;
 
@@ -28,6 +29,9 @@ class TvReceiver {
   /// the TV keeps the address hidden too).
   final Future<void> Function(Uri server, String code)? onServer;
   final String name;
+
+  /// The phone remote's Home key: back to the TV start screen.
+  final VoidCallback? onHome;
 
   /// The open player (set by PlayerScreen), driven by remote commands.
   final PlayerRemote remote = PlayerRemote();
@@ -254,6 +258,9 @@ class TvReceiver {
           return await _json(res, {'ok': error == null, 'error': error, 'state': state().toJson()});
         case ('GET', '/poll'):
           return await _poll(req);
+        // the paired phone reads the TV's log (TVs have no easy way to share a file)
+        case ('GET', '/log'):
+          return await _json(res, {'log': readLogTail(400)});
       }
       res.statusCode = HttpStatus.notFound;
     } on FormatException catch (e) {
@@ -386,6 +393,17 @@ class TvReceiver {
   Future<String?> _command(Map<String, Object?> body) async {
     final c = remote.controller;
     final action = body['action'];
+    // phone as the TV's remote: works on every screen, playing or not
+    if (action == 'key') {
+      final key = body['key'];
+      if (key == 'home') {
+        onHome?.call();
+        return null;
+      }
+      if (!Platform.isAndroid || key is! String) return 'TV không nhận phím này';
+      final ok = await const MethodChannel('torboxstrm/intent').invokeMethod<bool>('key', {'key': key}) ?? false;
+      return ok ? null : 'TV không nhận phím này';
+    }
     if (action == 'stop') {
       await remote.close?.call();
       return null;
