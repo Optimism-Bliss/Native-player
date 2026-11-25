@@ -113,20 +113,23 @@ flutter:
 
 # Same media_kit fork Fladder ships (DonutWare/media-kit), pinned for reproducible builds.
 dependency_overrides:
+  # media_kit (DonutWare fork, commit 05033ed3c7c538b58dfbbd4c29d6dc0479ce7dec) is vendored in third_party/
+  # so builds do not depend on that repository staying available. media_kit_video carries one Linux fix
+  # (third_party/media_kit_video/linux/texture_gl.cc); the other packages are unchanged copies.
+  # The prebuilt libmpv binaries are still downloaded at build time from media-kit's own releases.
   media_kit:
-    git: {url: https://github.com/DonutWare/media-kit.git, ref: 05033ed3c7c538b58dfbbd4c29d6dc0479ce7dec, path: ./media_kit}
-  # Vendored from the same commit with one Linux fix (see third_party/media_kit_video/linux/texture_gl.cc).
+    path: third_party/media_kit
   media_kit_video:
     path: third_party/media_kit_video
   media_kit_libs_video:
-    git: {url: https://github.com/DonutWare/media-kit.git, ref: 05033ed3c7c538b58dfbbd4c29d6dc0479ce7dec, path: ./libs/universal/media_kit_libs_video}
+    path: third_party/media_kit_libs_video
   media_kit_libs_android_video:
-    git: {url: https://github.com/DonutWare/media-kit.git, ref: 05033ed3c7c538b58dfbbd4c29d6dc0479ce7dec, path: libs/android/media_kit_libs_android_video}
+    path: third_party/media_kit_libs_android_video
   media_kit_libs_windows_video:
-    git: {url: https://github.com/DonutWare/media-kit.git, ref: 05033ed3c7c538b58dfbbd4c29d6dc0479ce7dec, path: libs/windows/media_kit_libs_windows_video}
+    path: third_party/media_kit_libs_windows_video
   media_kit_libs_linux:
-    git: {url: https://github.com/DonutWare/media-kit.git, ref: 05033ed3c7c538b58dfbbd4c29d6dc0479ce7dec, path: libs/linux/media_kit_libs_linux}
+    path: third_party/media_kit_libs_linux
   media_kit_libs_ios_video:
-    git: {url: https://github.com/DonutWare/media-kit.git, ref: 05033ed3c7c538b58dfbbd4c29d6dc0479ce7dec, path: libs/ios/media_kit_libs_ios_video}
+    path: third_party/media_kit_libs_ios_video
   media_kit_libs_macos_video:
-    git: {url: https://github.com/DonutWare/media-kit.git, ref: 05033ed3c7c538b58dfbbd4c29d6dc0479ce7dec, path: libs/macos/media_kit_libs_macos_video}
+    path: third_party/media_kit_libs_macos_video
