@@ -1,3 +1,8 @@
+**Có gì mới trong 2.0.2** (tự chọn bản theo màn hình cần server `2.0.3-dev` trở lên)
+- **Tua bằng remote trên thanh tiến trình:** ▲ ▼ di chuyển lên thanh tiến trình, ◀ ▶ tua xem trước (giờ hiện trên thanh, giữ phím thì tua 10 giây → 30 giây → 1 phút), bấm OK hoặc dừng tay là nhảy tới đó.
+- **TV box giải mã nhẹ hơn:** âm thanh DTS-HD Master Audio chỉ giải mã phần lõi DTS (phần lossless chạy bằng CPU, quá nặng với box như onn 4K và làm giật cả hình); nghe qua loa TV không khác.
+- **Tự chọn bản vừa màn hình:** app báo độ phân giải màn hình cho trang web; TV box nối màn 1080p ưu tiên bản 1080p thay vì 4K, màn 4K vẫn ưu tiên 4K.
+
 **Có gì mới trong 2.0.1** (cần server `2.0.2`; cài lên cả TV lẫn điện thoại)
 - **Điện thoại thành remote TV:** menu → "Remote <tên TV&gt;": ▲ ▼ ◀ ▶ (giữ để lặp), OK, Quay lại, Màn hình chính TV, Phát / tạm dừng. TV nhận phím như remote thật ở mọi màn hình (màn hình chính, trang web, trình phát, hộp thoại). Chọn ô nhập trên TV là ô gõ chữ hiện trên cùng và bàn phím điện thoại tự bật.
 - **TV tự kiểm tra cập nhật** và có nút "Cập nhật" ở màn hình chính; hộp thoại cập nhật bấm được bằng remote (OK = Cập nhật).
