@@ -52,3 +52,25 @@ trên GPU yếu, vẫn có ASS (ass-media) và PGS, giải mã DTS/TrueHD bằng
    (tua, tập kế, âm thanh, phụ đề, thông tin); nối với phần hiện có: phụ đề từ server (SubtitleConfiguration),
    tiến độ xem, tập kế, remote từ điện thoại (TvReceiver gọi vào trình phát native qua MethodChannel/pigeon).
    Việc lớn (ước 1.500–3.000 dòng Kotlin + Dart), làm trên nhánh riêng, bật bằng tuỳ chọn "Trình phát TV: Native / MPV".
+
+## 5. Các nhánh và lịch sử (kiểm tra 2026-11-25)
+
+- Nhánh: `main`, `develop` (trùng nhau ở v0.12.1), `feat/Add-notifications-for-desktop`, `feat/Library-search-screen-improvements`, `fix/slow-api-test-fix` (cả ba **đã gộp hết** vào develop, không còn commit riêng), `gh-pages` (web build).
+- Bài học về cửa sổ: 2026-11-14 họ **revert** việc nâng `window_manager` 0.7 + "native window" (lỗi cửa sổ thứ hai giết libmpv của cửa sổ thứ nhất), giữ `window_manager` 0.5.1; 2026-11-15 sửa SMTC làm hỏng quản lý cửa sổ; 2026-10-31 sửa crash khi đổi kích thước cửa sổ (macOS). → Đổi kích thước / cửa sổ phụ khi libmpv đang vẽ là vùng dễ lỗi, đúng như lỗi Windows của app này.
+
+## 6. Tính năng trình phát đáng lấy cho bản lớn
+
+| Tính năng | Fladder (commit / file) | Giá trị cho app này |
+| --- | --- | --- |
+| Trình phát native Media3 cho TV (ffmpeg audio, ass-media, tunneling, ít tài nguyên) | `android/.../player/ExoPlayer.kt`, `VideoPlayerActivity.kt` | Mượt trên TV box yếu, ASS + PGS, DTS/TrueHD |
+| Khớp tần số màn hình, chờ đổi xong, khôi phục trước khi đóng | #997, `utility/RefreshRateHelper.kt` | Hết giật đều 24p; bản 2.0.5 mới làm phần chọn mode |
+| Picture-in-Picture (Android/iOS) | #995 | Xem tiếp khi ra màn hình chính |
+| Nút chương trước / sau | #1063 | Phim có chapter (MKV) |
+| Phím tắt: lệch phụ đề, bật/tắt phụ đề, tua nhanh theo phím số | #1067, #961, #945 | Desktop / remote |
+| Esc không đóng trình phát khi đang mở hộp thoại | #922 | Đúng lỗi kiểu đã gặp |
+| Chọn đúng track mặc định khi có nhiều "default" | #1044 | Phim có nhiều phụ đề / âm thanh |
+| Giữ phụ đề khi hiện "tập kế" | #1150 | |
+| Tuỳ chỉnh phụ đề (cỡ, đậm, màu, viền) và lưu lại | #1075, MDK #807 | Phụ đề tiếng Việt dễ đọc trên TV |
+| Phím media hệ điều hành: SMTC (Windows), MPRIS (Linux), bài trước / sau | `smtc_windows`, #843 | Bàn phím media, tai nghe |
+| Trình phát MDK (fvp) làm lựa chọn, HDR tốt hơn | `lib/wrappers/players/lib_mdk.dart`, #807 | Dự phòng nếu libmpv lỗi trên máy nào đó |
+| Lặp / gapless mpv | 2026-11-20 | |
