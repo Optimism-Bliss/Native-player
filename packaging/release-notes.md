@@ -1,6 +1,10 @@
-**Có gì mới trong 2.0.0** (cần server `2.0.0`)
-- **iPhone / iPad (thử nghiệm):** file `TorBox-STRM-ios.ipa` chưa ký. Tự cài bằng TrollStore (vĩnh viễn), AltStore / SideStore (Apple ID thường, ký lại 7 ngày một lần) hoặc eSign / chứng chỉ riêng. Ghép TV bằng quét QR (iOS không cho tự dò TV trong mạng); nhật ký nằm trong ứng dụng Tệp → Trên iPhone → TorBox STRM. Cập nhật: tải IPA mới rồi cài đè bằng cùng công cụ.
-- **Server 2.0.0:** tab Anime và HHTQ, khám phá JAV theo diễn viên (hot trong tháng, mọi phim mới nhất trước, lọc hãng / thể loại, ＋ thêm nhanh bản TorBox có sẵn). Các tính năng này có ngay trong app khi server cập nhật.
+**Có gì mới trong 2.0.0** (cần server `2.0.1`)
+- **Phát trên TV mượt hơn:** TV box giải mã **trực tiếp ra màn hình** (trước đây mỗi khung hình bị chép lại để vẽ bằng GPU, 4K / HEVC dễ giật). Mặc định bật trên TV; đổi ở nút "Giải mã" trên màn hình chính của TV hoặc menu app, mở lại app để áp dụng. Ở chế độ này phụ đề hiện dạng chữ thường.
+- **Đăng nhập TV bằng QR, duyệt một chạm:** TV hiện QR ngay ở trang đăng nhập; quét bằng camera điện thoại có app, app tự mở trang xác nhận, bấm **Cho phép** là TV vào.
+- **Sửa lỗi app bị thoát** khi quét QR / mở link `torboxstrm://` (ghép TV, mã máy chủ).
+- **Thông tin phát** có thêm fps, số khung hình bị rơi và số giây đã tải sẵn, để chẩn đoán giật.
+- **iPhone / iPad (thử nghiệm):** file `TorBox-STRM-ios.ipa` chưa ký. Tự cài bằng TrollStore (vĩnh viễn), AltStore / SideStore (Apple ID thường, ký lại 7 ngày một lần) hoặc eSign / chứng chỉ riêng. Ghép TV bằng quét QR; nhật ký nằm trong ứng dụng Tệp → Trên iPhone → TorBox STRM. Cập nhật: tải IPA mới rồi cài đè bằng cùng công cụ.
+- **Server 2.0.x:** tab Anime và HHTQ, khám phá JAV theo diễn viên (hot trong tháng, phim mới nhất trước, lọc hãng / thể loại, ＋ thêm nhanh bản TorBox có sẵn). Có ngay trong app khi server cập nhật.
 
 **Có gì mới trong 1.1.5** (cần server `1.7.0-dev.12`)
 - **Chọn vai trò khi mở lần đầu:** "Điện thoại / máy tính" hay "TV" (Android). Đổi lại: menu điện thoại → "Dùng máy này làm TV"; trên TV → "Dùng như điện thoại".
@@ -31,7 +35,7 @@
 
 Native TorBox STRM app: browse the TorBox STRM web UI and play in a libmpv player (Fladder-style controls).
 
-**Server:** needs TorBox STRM `2.0.0` or later (`1.7.0-dev.12` for the app features before 2.0.0) for everything above (`1.7.0-dev.5`+ for the in-app player).
+**Server:** needs TorBox STRM `2.0.1` or later (`1.7.0-dev.12` for the app features before 2.0.0) for everything above (`1.7.0-dev.5`+ for the in-app player).
 
 **Updates:** the app checks this page for new releases and installs them (Android asks for permission to install apps once). Builds from 0.4.3 on are signed with a fixed release key; if you installed 0.4.0–0.4.2, uninstall it once before installing this version.
 
