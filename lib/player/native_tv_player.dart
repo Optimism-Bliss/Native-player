@@ -10,6 +10,7 @@ import '../tv/tv_input.dart';
 import '../util/format.dart';
 import '../util/log.dart';
 import 'playback_controller.dart';
+import 'player_settings.dart';
 import 'tv_playback_prefs.dart';
 import 'widgets/track_sheets.dart';
 
@@ -73,6 +74,12 @@ class NativeTvPlayer {
         'startMs': request.start.inMilliseconds,
         'matchFrameRate': TvPlaybackPrefs.matchFrameRate,
         'tunneling': TvPlaybackPrefs.tunneling,
+        'autoNext': PlayerSettings.autoNext,
+        'seekBackMs': PlayerSettings.seekBack * 1000,
+        'seekForwardMs': PlayerSettings.seekForward * 1000,
+        'bufferMb': PlayerSettings.effectiveBufferMb,
+        'audioLang': PlayerSettings.audioLang,
+        'subLang': PlayerSettings.subLang,
       });
       if (ok != true) throw StateError('native player did not open');
       _askSubtitles();

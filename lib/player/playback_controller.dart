@@ -7,6 +7,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import '../bridge.dart';
 import '../util/tv_mode.dart';
+import 'player_settings.dart';
 import 'subtitle_style.dart';
 import 'tv_playback_prefs.dart';
 import '../util/log.dart';
@@ -85,8 +86,9 @@ class PlayerHost {
       await native.setProperty('cache', 'yes');
       // TV boxes have little RAM (onn 4K: 2 GB, shared with the web page): a smaller cache
       // still holds 30-60 s of 1080p and keeps Android from killing the app
-      await native.setProperty('demuxer-max-bytes', isTvDevice ? '64M' : '150M');
-      await native.setProperty('demuxer-max-back-bytes', isTvDevice ? '16M' : '50M');
+      final mb = PlayerSettings.effectiveBufferMb;
+      await native.setProperty('demuxer-max-bytes', '${mb}M');
+      await native.setProperty('demuxer-max-back-bytes', '${(mb / 3).round().clamp(8, 160)}M');
       await native.setProperty('network-timeout', '60');
       await native.setProperty('stream-buffer-size', '4M');
       final hz = TvPlaybackPrefs.displayRefreshRate();
@@ -113,8 +115,8 @@ class PlayerHost {
       await native.setProperty('cache-pause-wait', '3');
       await native.setProperty('demuxer-readahead-secs', '60');
       // Prefer Vietnamese, then English, for embedded tracks.
-      await native.setProperty('slang', 'vi,vie,vn,en,eng');
-      await native.setProperty('alang', 'vi,vie,vn,en,eng,ja,jpn');
+      await native.setProperty('slang', PlayerSettings.mpvLangs(PlayerSettings.subLang));
+      await native.setProperty('alang', PlayerSettings.mpvLangs(PlayerSettings.audioLang, audio: true));
       if (defaultTargetPlatform == TargetPlatform.android) {
         await native.setProperty('ao', 'audiotrack');
         // DTS-HD Master Audio: decode only its DTS core. The lossless extension is decoded on the
@@ -210,6 +212,12 @@ class PlaybackController {
       // Per-file subtitle delay must not leak into the next session.
       await native.setProperty('sub-delay', '0');
       await native.setProperty('sub-visibility', 'yes');
+      // settings may have changed since the shared player was created
+      final mb = PlayerSettings.effectiveBufferMb;
+      await native.setProperty('demuxer-max-bytes', '${mb}M');
+      await native.setProperty('demuxer-max-back-bytes', '${(mb / 3).round().clamp(8, 160)}M');
+      await native.setProperty('slang', PlayerSettings.mpvLangs(PlayerSettings.subLang));
+      await native.setProperty('alang', PlayerSettings.mpvLangs(PlayerSettings.audioLang, audio: true));
     }
     // The shared player keeps its speed; every session starts at 1×.
     await player.setRate(1.0);
@@ -431,7 +439,7 @@ class PlaybackController {
 
   void _onCompleted() {
     reportProgress(force: true);
-    if (hasNext) next();
+    if (hasNext && PlayerSettings.autoNext) next();
   }
 
   Future<void> playAt(int i) async {

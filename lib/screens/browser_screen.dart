@@ -15,6 +15,7 @@ import '../bridge.dart';
 import '../player/native_tv_player.dart';
 import '../player/playback_controller.dart';
 import '../player/player_screen.dart';
+import '../player/player_settings_screen.dart';
 import '../player/tv_playback_prefs.dart';
 import '../connect_code.dart';
 import '../settings.dart';
@@ -887,6 +888,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
                   ('home', IconsaxPlusLinear.home_2, 'Về trang chủ'),
                   ('server', IconsaxPlusLinear.global_edit, 'Đổi máy chủ'),
                   ('signout', IconsaxPlusLinear.logout, 'Đăng xuất'),
+                  ('player-settings', IconsaxPlusLinear.setting_2, 'Cài đặt trình phát'),
                   ('update', IconsaxPlusLinear.refresh_circle, 'Kiểm tra cập nhật'),
                   ('log', IconsaxPlusLinear.document_text, 'Nhật ký'),
                   if (QrScanScreen.available && !isTvDevice)
@@ -912,6 +914,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
         await _signOut();
       case 'update':
         if (mounted) await checkForUpdate(context);
+      case 'player-settings':
+        if (mounted) await PlayerSettingsScreen.open(context);
       case 'log':
         await _showLog();
       case 'role':
@@ -1152,6 +1156,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
               'signout' => _signOut(),
               'server' => _changeServer(),
               'update' => checkForUpdate(context),
+              'player-settings' => PlayerSettingsScreen.open(context),
               'log' => _showLog(),
               'web-window' => WebWindow.setEnabled(!_external).then((_) => _snack('Đã lưu — mở lại app để áp dụng')),
               _ => _onTvMenu(v),
@@ -1199,6 +1204,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
                     subtitle: const Text('Áp dụng khi mở lại app'),
                   ),
                 ),
+              const PopupMenuItem(
+                value: 'player-settings',
+                child: ListTile(leading: Icon(IconsaxPlusLinear.setting_2), title: Text('Cài đặt trình phát')),
+              ),
               const PopupMenuItem(
                 value: 'log',
                 child: ListTile(leading: Icon(IconsaxPlusLinear.document_text), title: Text('Nhật ký')),

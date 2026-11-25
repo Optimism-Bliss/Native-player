@@ -7,6 +7,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../bridge.dart';
 import '../player/native_tv_player.dart';
 import '../player/playback_controller.dart';
+import '../player/player_settings_screen.dart';
 import '../player/player_screen.dart';
 import '../screens/browser_screen.dart';
 import '../screens/connect_screen.dart';
@@ -235,78 +236,12 @@ class _TvHomeState extends State<TvHome> {
                             ),
                             OutlinedButton.icon(
                               onPressed: () async {
-                                await TvPlaybackPrefs.setNativePlayer(!TvPlaybackPrefs.nativePlayer);
-                                if (!context.mounted) return;
-                                setState(() {});
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      TvPlaybackPrefs.nativePlayer
-                                          ? 'Trình phát Media3: giải mã thẳng ra màn hình, mượt trên box yếu.'
-                                          : 'Trình phát mpv: dùng khi Media3 không phát được phim nào đó.',
-                                    ),
-                                  ),
-                                );
+                                await PlayerSettingsScreen.open(context);
+                                if (mounted) setState(() {});
                               },
-                              icon: const Icon(IconsaxPlusLinear.video_play),
-                              label: Text('Trình phát: ${TvPlaybackPrefs.nativePlayer ? 'Media3' : 'mpv'}'),
+                              icon: const Icon(IconsaxPlusLinear.setting_2),
+                              label: Text('Cài đặt trình phát (${TvPlaybackPrefs.nativePlayer ? 'Media3' : 'mpv'})'),
                             ),
-                            if (TvPlaybackPrefs.nativePlayer)
-                              OutlinedButton.icon(
-                                onPressed: () async {
-                                  await TvPlaybackPrefs.setTunneling(!TvPlaybackPrefs.tunneling);
-                                  if (!context.mounted) return;
-                                  setState(() {});
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        TvPlaybackPrefs.tunneling
-                                            ? 'Tunneling: chip TV tự đồng bộ hình và tiếng. Tắt đi nếu mất hình / tiếng.'
-                                            : 'Đã tắt tunneling.',
-                                      ),
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(IconsaxPlusLinear.flash),
-                                label: Text('Tunneling: ${TvPlaybackPrefs.tunneling ? 'bật' : 'tắt'}'),
-                              ),
-                            OutlinedButton.icon(
-                              onPressed: () async {
-                                await TvPlaybackPrefs.setMatchFrameRate(!TvPlaybackPrefs.matchFrameRate);
-                                if (!context.mounted) return;
-                                setState(() {});
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      TvPlaybackPrefs.matchFrameRate
-                                          ? 'Khớp tần số: màn hình chuyển theo phim (24/25/30 Hz) khi phát; có thể tối khoảng 1 giây.'
-                                          : 'Đã tắt khớp tần số màn hình.',
-                                    ),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(IconsaxPlusLinear.monitor),
-                              label: Text('Khớp tần số: ${TvPlaybackPrefs.matchFrameRate ? 'bật' : 'tắt'}'),
-                            ),
-                            if (!TvPlaybackPrefs.nativePlayer)
-                              OutlinedButton.icon(
-                                onPressed: () async {
-                                  await TvPlaybackPrefs.setCompat(!TvPlaybackPrefs.compat);
-                                  if (!context.mounted) return;
-                                  setState(() {});
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        TvPlaybackPrefs.compat
-                                            ? 'Chế độ tương thích: chép từng khung hình (dùng khi phim không lên hình). Mở lại app để áp dụng.'
-                                            : 'Giải mã không chép khung hình (mượt hơn). Mở lại app để áp dụng.',
-                                      ),
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(IconsaxPlusLinear.cpu),
-                                label: Text('Tương thích: ${TvPlaybackPrefs.compat ? 'bật' : 'tắt'}'),
-                              ),
                             OutlinedButton.icon(
                               onPressed: _rx.newCode,
                               icon: const Icon(IconsaxPlusLinear.refresh),

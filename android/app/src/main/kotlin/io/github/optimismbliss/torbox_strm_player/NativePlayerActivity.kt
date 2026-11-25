@@ -95,6 +95,12 @@ class NativePlayerActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
     private var items: List<Item> = emptyList()
     private var matchFrameRate = false
+    private var autoNext = true
+    private var seekBackMs = 10_000L
+    private var seekForwardMs = 30_000L
+    private var bufferMb = 0
+    private var audioLang = "vi"
+    private var subLang = "vi"
     private var ready = false
 
     /// Server subtitle just added: selected as soon as its track shows up.
@@ -143,6 +149,12 @@ class NativePlayerActivity : Activity() {
         }
         matchFrameRate = args["matchFrameRate"] == true
         val tunneling = args["tunneling"] == true
+        autoNext = args["autoNext"] != false
+        seekBackMs = (args["seekBackMs"] as? Number)?.toLong() ?: 10_000L
+        seekForwardMs = (args["seekForwardMs"] as? Number)?.toLong() ?: 30_000L
+        bufferMb = (args["bufferMb"] as? Number)?.toInt() ?: 0
+        audioLang = (args["audioLang"] as? String).orEmpty()
+        subLang = (args["subLang"] as? String).orEmpty()
         val index = ((args["index"] as? Number)?.toInt() ?: 0).coerceIn(0, items.size - 1)
         val startMs = (args["startMs"] as? Number)?.toLong() ?: 0L
 
@@ -194,15 +206,17 @@ class NativePlayerActivity : Activity() {
                             .build()
                     )
                     .setTunnelingEnabled(tunneling)
-                    .setPreferredAudioLanguages("vi", "en")
-                    .setPreferredTextLanguages("vi", "en")
+                    .setPreferredAudioLanguages(*listOf(audioLang, "vi", "en").filter { it.isNotEmpty() }.distinct().toTypedArray())
+                    .setPreferredTextLanguages(*listOf(subLang, "vi", "en").filter { it.isNotEmpty() }.distinct().toTypedArray())
                     .setAllowInvalidateSelectionsOnRendererCapabilitiesChange(true)
             )
         }
         // Streaming from a CDN: keep up to 2 minutes ahead, capped in bytes for 1-2 GB boxes.
         val load = DefaultLoadControl.Builder()
             .setBufferDurationsMs(30_000, 120_000, 2_500, 5_000)
-            .setTargetBufferBytes(if (lowRam) 48 * 1024 * 1024 else 96 * 1024 * 1024)
+            .setTargetBufferBytes(
+                if (bufferMb > 0) bufferMb * 1024 * 1024 else if (lowRam) 48 * 1024 * 1024 else 96 * 1024 * 1024
+            )
             .setPrioritizeTimeOverSizeThresholds(false)
             .build()
         return ExoPlayer.Builder(this)
@@ -213,8 +227,9 @@ class NativePlayerActivity : Activity() {
                 true,
             )
             .setHandleAudioBecomingNoisy(true)
-            .setSeekBackIncrementMs(10_000)
-            .setSeekForwardIncrementMs(10_000)
+            .setSeekBackIncrementMs(seekBackMs)
+            .setSeekForwardIncrementMs(seekForwardMs)
+            .setPauseAtEndOfMediaItems(!autoNext)
             .setVideoScalingMode(C.VIDEO_SCALING_MODE_SCALE_TO_FIT)
             .buildWithAssSupport(
                 this,
@@ -602,7 +617,7 @@ class NativePlayerActivity : Activity() {
             // Controls hidden: left / right seek 10 s (held: keeps seeking), OK / up / down show them.
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> if (!shown) {
                 if (event.action == KeyEvent.ACTION_DOWN) {
-                    val step = if (event.repeatCount > 8) 30_000L else 10_000L
+                    val step = if (event.repeatCount > 8) maxOf(30_000L, seekBackMs) else seekBackMs
                     seekBy(if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT) -step else step)
                 }
                 return true

@@ -16,6 +16,8 @@ import '../util/log.dart';
 import '../util/tv_mode.dart';
 import 'native_tv_player.dart';
 import 'pip.dart';
+import 'player_settings.dart';
+import 'player_settings_screen.dart';
 import 'playback_controller.dart';
 import 'widgets/progress_bar.dart';
 import 'widgets/subtitle_style_sheet.dart';
@@ -110,7 +112,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         if (playing && _overlay) _restartHideTimer();
         // phones: Home while playing shrinks the film into a small window
         final w = c.player.state.width ?? 16, h = c.player.state.height ?? 9;
-        Pip.arm(playing, width: w, height: h);
+        Pip.arm(playing && PlayerSettings.autoPip, width: w, height: h);
       });
       Pip.onDismissed = () {
         if (mounted) c.player.pause();
@@ -235,7 +237,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final size = MediaQuery.sizeOf(context);
     final y = d.localFocalPoint.dy;
     // Leave the screen edges to the system gestures (status/navigation bars).
-    if (_swipeIsPinch || !DeviceControls.supported || y < size.height * 0.08 || y > size.height * 0.92) return;
+    if (_swipeIsPinch ||
+        !PlayerSettings.swipeGestures ||
+        !DeviceControls.supported ||
+        y < size.height * 0.08 ||
+        y > size.height * 0.92) {
+      return;
+    }
     final side = d.localFocalPoint.dx < size.width / 2 ? 'brightness' : 'volume';
     try {
       _swipeValue = side == 'brightness' ? await DeviceControls.brightness() : await DeviceControls.volume();
@@ -475,9 +483,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     } else if (key == LogicalKeyboardKey.arrowRight) {
       act(() => _seek(5));
     } else if (key == LogicalKeyboardKey.keyJ) {
-      act(() => _seek(-10));
+      act(() => _seek(-PlayerSettings.seekBack));
     } else if (key == LogicalKeyboardKey.keyL) {
-      act(() => _seek(30));
+      act(() => _seek(PlayerSettings.seekForward));
     } else if (key == LogicalKeyboardKey.arrowUp) {
       act(() => _setVolume(c.player.state.volume + 5));
     } else if (key == LogicalKeyboardKey.arrowDown) {
@@ -535,11 +543,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// a TV-specific key (fall through to the common keys).
   KeyEventResult? _onTvKey(LogicalKeyboardKey key, bool repeat) {
     if (key == LogicalKeyboardKey.mediaFastForward) {
-      _seek(30);
+      _seek(PlayerSettings.seekForward);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.mediaRewind) {
-      _seek(-10);
+      _seek(-PlayerSettings.seekBack);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.mediaTrackNext) {
@@ -571,9 +579,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       return KeyEventResult.ignored;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
-      _seek(-10);
+      _seek(-PlayerSettings.seekBack);
     } else if (key == LogicalKeyboardKey.arrowRight) {
-      _seek(10);
+      _seek(PlayerSettings.seekBack);
     } else if (!repeat) {
       if (_select.contains(key)) c.player.playOrPause();
       _showOverlay();
@@ -717,12 +725,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
         behavior: HitTestBehavior.opaque,
         onTap: () => _showOverlay(!_overlay),
         onDoubleTapDown: (d) {
+          if (!PlayerSettings.doubleTapSeek) return;
           final width = MediaQuery.sizeOf(context).width;
           final x = d.localPosition.dx;
           if (x < width * 0.4) {
-            _seek(-10);
+            _seek(-PlayerSettings.seekBack);
           } else if (x > width * 0.6) {
-            _seek(10);
+            _seek(PlayerSettings.seekBack);
           } else {
             c.player.playOrPause();
           }
@@ -855,6 +864,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
               valueListenable: c.index,
               builder: (context, i, _) => _Title(title: widget.request.queue[i].title, logo: widget.request.logo),
             ),
+          ),
+          IconButton(
+            tooltip: 'Cài đặt trình phát',
+            onPressed: () async {
+              _hideTimer?.cancel();
+              await PlayerSettingsScreen.open(context, player: c.player);
+              if (!mounted) return;
+              setState(() {});
+              _restartHideTimer();
+            },
+            icon: const Icon(IconsaxPlusLinear.setting_2),
           ),
           if (_touch) IconButton(onPressed: _close, tooltip: 'Dừng', icon: const Icon(IconsaxPlusLinear.close_square)),
         ],
@@ -1008,10 +1028,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
         ),
       ),
       IconButton(
-        tooltip: '-10 giây',
-        onPressed: () => _seek(-10),
+        tooltip: '-${PlayerSettings.seekBack} giây',
+        onPressed: () => _seek(-PlayerSettings.seekBack),
         iconSize: seek,
-        icon: const _SeekIcon(forward: false, seconds: 10),
+        icon: _SeekIcon(forward: false, seconds: PlayerSettings.seekBack),
       ),
       StreamBuilder<bool>(
         stream: c.player.stream.playing,
@@ -1028,10 +1048,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
         ),
       ),
       IconButton(
-        tooltip: '+30 giây',
-        onPressed: () => _seek(30),
+        tooltip: '+${PlayerSettings.seekForward} giây',
+        onPressed: () => _seek(PlayerSettings.seekForward),
         iconSize: seek,
-        icon: const _SeekIcon(forward: true, seconds: 30),
+        icon: _SeekIcon(forward: true, seconds: PlayerSettings.seekForward),
       ),
       ValueListenableBuilder<int>(
         valueListenable: c.index,

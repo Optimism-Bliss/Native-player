@@ -4,7 +4,7 @@ import 'package:media_kit/media_kit.dart';
 import '../subtitle_style.dart';
 
 /// Size, weight, colour and background of subtitles; applied live and kept for next time.
-Future<void> showSubtitleStyleSheet(BuildContext context, Player player) {
+Future<void> showSubtitleStyleSheet(BuildContext context, Player? player) {
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
@@ -15,7 +15,7 @@ Future<void> showSubtitleStyleSheet(BuildContext context, Player player) {
 
 class _StyleSheet extends StatefulWidget {
   const _StyleSheet({required this.player});
-  final Player player;
+  final Player? player;
 
   @override
   State<_StyleSheet> createState() => _StyleSheetState();
@@ -27,7 +27,8 @@ class _StyleSheetState extends State<_StyleSheet> {
   Future<void> _set(SubtitleStyle next) async {
     setState(() => s = next);
     await next.save();
-    await next.apply(widget.player);
+    final p = widget.player;
+    if (p != null) await next.apply(p);
   }
 
   @override
