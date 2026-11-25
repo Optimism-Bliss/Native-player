@@ -66,6 +66,10 @@ class PlayerHost {
       await native.setProperty('demuxer-max-back-bytes', '50M');
       await native.setProperty('network-timeout', '60');
       await native.setProperty('stream-buffer-size', '4M');
+      // When the cache runs dry, wait for a few seconds of data before playing on: one longer
+      // wait instead of a stop every second on a link that is barely fast enough.
+      await native.setProperty('cache-pause-wait', '3');
+      await native.setProperty('demuxer-readahead-secs', '60');
       // Prefer Vietnamese, then English, for embedded tracks.
       await native.setProperty('slang', 'vi,vie,vn,en,eng');
       await native.setProperty('alang', 'vi,vie,vn,en,eng,ja,jpn');
@@ -230,6 +234,8 @@ class PlaybackController {
       ..reset()
       ..start();
     _loadedLogged = _playingLogged = false;
+    _waitSince = null;
+    _waits = 0;
     if (!_fileLoaded.isCompleted) _fileLoaded.complete(false);
     _fileLoaded = Completer<bool>();
     appLog('play: open "${item.title}"${start > Duration.zero ? ' at ${start.inSeconds}s' : ''}');
@@ -260,11 +266,54 @@ class PlaybackController {
   bool _playingLogged = false;
   String get _t => '${_watch.elapsedMilliseconds} ms';
 
+  /// Start of the current wait for data during playback (not the initial load).
+  DateTime? _waitSince;
+  int _waits = 0;
+
+  Future<String> _prop(String name) async {
+    final n = player.platform;
+    if (n is! NativePlayer) return '';
+    try {
+      return await n.getProperty(name);
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// Download speed now, the file's average bitrate and seconds buffered: tells a slow
+  /// link (speed below bitrate, cache at 0) from a slow decoder.
+  Future<String> _netStats() async {
+    final speed = double.tryParse(await _prop('cache-speed')) ?? 0; // bytes/s
+    final size = double.tryParse(await _prop('file-size')) ?? 0;
+    final dur = double.tryParse(await _prop('duration')) ?? 0;
+    final cached = double.tryParse(await _prop('demuxer-cache-duration')) ?? 0;
+    final rate = size > 0 && dur > 0 ? size * 8 / dur / 1e6 : 0.0;
+    return 'tải ${(speed * 8 / 1e6).toStringAsFixed(1)} Mbit/s · phim ${rate.toStringAsFixed(1)} Mbit/s'
+        ' · đệm ${cached.toStringAsFixed(0)} s';
+  }
+
+  Future<void> _logStream() async {
+    final codec = await _prop('video-codec');
+    final w = await _prop('width'), h = await _prop('height');
+    final hw = await _prop('hwdec-current');
+    appLog('play: ${w}x$h $codec · giải mã ${hw.isEmpty || hw == 'no' ? 'mềm' : hw} · ${await _netStats()}');
+  }
+
   void _onBuffering(bool buffering) {
     _stallTimer?.cancel();
     if (!buffering && !_playingLogged && player.state.duration > Duration.zero) {
       _playingLogged = true;
       appLog('play: picture after $_t');
+      unawaited(_logStream());
+    } else if (_playingLogged) {
+      if (buffering) {
+        _waitSince ??= DateTime.now();
+      } else if (_waitSince != null) {
+        final ms = DateTime.now().difference(_waitSince!).inMilliseconds;
+        _waitSince = null;
+        _waits++;
+        unawaited(_netStats().then((n) => appLog('play: waited for data $ms ms (lần $_waits) · $n')));
+      }
     }
     if (!buffering) {
       if (recovering.value) recovering.value = false;

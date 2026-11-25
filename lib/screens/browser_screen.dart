@@ -478,23 +478,24 @@ class _BrowserScreenState extends State<BrowserScreen> {
     return u.origin;
   }
 
-  Future<void> _showLog() async {
-    final text = readLogTail();
+  Future<void> _showLog({String? text, String title = 'Nhật ký', String? path}) async {
+    final body = text ?? readLogTail();
+    final where = path ?? logFilePath;
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Nhật ký'),
+        title: Text(title),
         content: SizedBox(
           width: 720,
           height: 420,
           child: SingleChildScrollView(
             reverse: true,
-            child: SelectableText(text, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+            child: SelectableText(body, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Clipboard.setData(ClipboardData(text: '$logFilePath\n$text')),
+            onPressed: () => Clipboard.setData(ClipboardData(text: '$where\n$body')),
             child: const Text('Chép'),
           ),
           FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Đóng')),
@@ -826,6 +827,12 @@ class _BrowserScreenState extends State<BrowserScreen> {
     ),
     if (_tv != null)
       ListTile(
+        leading: const Icon(IconsaxPlusLinear.document_text),
+        title: Text('Xem nhật ký ${_tv?.name ?? 'TV'}'),
+        onTap: () => Navigator.pop(context, 'tv-log'),
+      ),
+    if (_tv != null)
+      ListTile(
         leading: const Icon(IconsaxPlusLinear.monitor_mobbile),
         title: const Text('Ngắt kết nối TV'),
         onTap: () => Navigator.pop(context, 'tv-forget'),
@@ -840,6 +847,27 @@ class _BrowserScreenState extends State<BrowserScreen> {
         await _pairManually();
       case 'tv-forget':
         await _forgetTv();
+      case 'tv-log':
+        await _showTvLog();
+    }
+  }
+
+  Future<void> _showTvLog() async {
+    final tv = _tv;
+    if (tv == null) return;
+    final client = TvClient(tv);
+    try {
+      final text = await client.log();
+      if (!mounted) return;
+      await _showLog(
+        text: text.isEmpty ? 'TV chưa có nhật ký.' : text,
+        title: 'Nhật ký ${tv.name}',
+        path: 'TV ${tv.name}',
+      );
+    } on TvError catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      client.close();
     }
   }
 

@@ -254,6 +254,9 @@ class TvReceiver {
           return await _json(res, {'ok': error == null, 'error': error, 'state': state().toJson()});
         case ('GET', '/poll'):
           return await _poll(req);
+        // the paired phone reads the TV's log (TVs have no easy way to share a file)
+        case ('GET', '/log'):
+          return await _json(res, {'log': readLogTail(400)});
       }
       res.statusCode = HttpStatus.notFound;
     } on FormatException catch (e) {
