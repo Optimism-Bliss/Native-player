@@ -1,5 +1,6 @@
 package io.github.optimismbliss.torbox_strm_player
 
+import android.app.PictureInPictureParams
 import android.app.UiModeManager
 import android.content.ActivityNotFoundException
 import android.content.pm.PackageManager
@@ -10,6 +11,7 @@ import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.util.Rational
 import android.os.SystemClock
 import android.view.KeyEvent
 import androidx.core.content.FileProvider
@@ -20,6 +22,11 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private var channel: MethodChannel? = null
+    private var pipChannel: MethodChannel? = null
+
+    /// Phone player playing: Home / recent apps shrink the video into a picture-in-picture window.
+    private var pipArmed = false
+    private var pipAspect = Rational(16, 9)
 
     /// Pairing link (torboxstrm://pair?...) that opened the app, until Flutter reads it.
     private var pendingLink: String? = null
@@ -27,6 +34,48 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         pendingLink = pairLink(intent)
+        pipChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "torboxstrm/pip").also { ch ->
+            ch.setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "arm" -> {
+                        pipArmed = call.argument<Boolean>("on") == true && supportsPip()
+                        val w = call.argument<Int>("w") ?: 16
+                        val h = call.argument<Int>("h") ?: 9
+                        if (w > 0 && h > 0) {
+                            // Android accepts 1:2.39 .. 2.39:1
+                            val r = w.toDouble() / h
+                            pipAspect = if (r > 2.39) Rational(239, 100) else if (r < 0.42) Rational(100, 239) else Rational(w, h)
+                        }
+                        updatePipParams()
+                        result.success(pipArmed)
+                    }
+                    "enter" -> result.success(enterPip())
+                    else -> result.notImplemented()
+                }
+            }
+        }
+        // Android TV: Media3 player in its own activity (NativePlayerActivity).
+        val native = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "torboxstrm/native_player")
+        NativePlayerBridge.channel = native
+        native.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "open" -> {
+                    val args = call.arguments as? Map<*, *> ?: return@setMethodCallHandler result.success(false)
+                    // a new title replaces the one playing
+                    NativePlayerBridge.activity?.command("stop", emptyMap<String, Any>())
+                    NativePlayerBridge.pendingArgs = args
+                    startActivity(Intent(this, NativePlayerActivity::class.java))
+                    result.success(true)
+                }
+                "command" -> {
+                    val player = NativePlayerBridge.activity
+                        ?: return@setMethodCallHandler result.success("Trình phát đã đóng")
+                    val args = call.arguments as? Map<*, *> ?: emptyMap<String, Any>()
+                    result.success(player.command(args["action"] as? String ?: "", args))
+                }
+                else -> result.notImplemented()
+            }
+        }
         // Opens the web UI's "intent://…" links for external players (VLC, MX Player…)
         // exactly as Chrome would, including S.browser_fallback_url.
         channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "torboxstrm/intent")
@@ -69,6 +118,62 @@ class MainActivity : FlutterActivity() {
             }
     }
 
+    private fun supportsPip(): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !isTv() &&
+            packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+
+    private fun pipParams(): PictureInPictureParams? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
+        val b = PictureInPictureParams.Builder().setAspectRatio(pipAspect)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            b.setAutoEnterEnabled(pipArmed)
+            b.setSeamlessResizeEnabled(true)
+        }
+        return b.build()
+    }
+
+    private fun updatePipParams() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !supportsPip()) return
+        try {
+            pipParams()?.let { setPictureInPictureParams(it) }
+        } catch (e: Exception) {
+        }
+    }
+
+    private fun enterPip(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !supportsPip()) return false
+        return try {
+            enterPictureInPictureMode(pipParams()!!)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private var started = false
+
+    override fun onStart() {
+        super.onStart()
+        started = true
+    }
+
+    override fun onStop() {
+        started = false
+        super.onStop()
+    }
+
+    // Android 8-11 (12+ enters on its own with auto-enter)
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (pipArmed && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) enterPip()
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        // closed from the small window (swiped away / ✕): the activity is stopped, playback should stop too
+        val dismissed = !isInPictureInPictureMode && !started
+        pipChannel?.invokeMethod("pip", mapOf("on" to isInPictureInPictureMode, "dismissed" to dismissed))
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         val link = pairLink(intent) ?: return
@@ -91,6 +196,11 @@ class MainActivity : FlutterActivity() {
             "back" -> KeyEvent.KEYCODE_BACK
             "playpause" -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
             else -> return false
+        }
+        // the TV player is on top: the key goes to it
+        NativePlayerBridge.activity?.let { player ->
+            player.runOnUiThread { player.pressKey(code) }
+            return true
         }
         runOnUiThread {
             val t = SystemClock.uptimeMillis()

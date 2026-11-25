@@ -1,3 +1,12 @@
+**Có gì mới trong 2.1.0** (bản lớn trình phát, học theo Fladder; gồm cả 2.0.5 chưa phát hành)
+- **TV: trình phát mới Media3** (như Fladder trên Android TV): hình đi thẳng từ chip giải mã ra màn hình, không qua GPU — mượt hơn hẳn trên box yếu (Mi Box S). Âm thanh DTS / TrueHD box không tự giải mã được thì dùng FFmpeg; phụ đề ASS vẽ bằng libass; phụ đề từ server vẫn tự bật như trước. Remote: ◀ ▶ tua 10 giây (giữ: 30 giây), OK / ▲ ▼ hiện thanh điều khiển, Back ẩn thanh rồi thoát. Màn hình chính TV có nút **"Trình phát: Media3 / mpv"** để quay về mpv nếu phim nào không phát được, và **"Tunneling"** (thử khi vẫn giật).
+- **TV: khớp tần số màn hình** chờ TV chuyển chế độ xong mới phát tiếp, và trả lại tần số cũ trước khi đóng trình phát (tránh màn đen ở loa / amply HDMI).
+- **Windows: một cửa sổ duy nhất.** Trang web nằm trong cửa sổ app; bấm ▶ thì phim phát ngay trong cửa sổ đó (toàn màn hình), đóng phim là trang hiện lại. Hết cảnh trình phát nằm sau, cửa sổ "đứng hình", Win+D không ẩn được. Esc lần đầu thoát toàn màn hình, lần hai đóng phim.
+- **Chương phim:** nút chương trước / sau (phím PgUp / PgDn) khi file có chương, kèm tên chương.
+- **Phím tắt phụ đề:** Z / X lệch phụ đề ∓100 ms, S hoặc V ẩn / hiện phụ đề, phím số 0–9 nhảy tới 0 %–90 % phim.
+- **Kiểu chữ phụ đề:** nút **T** (hoặc "Kiểu chữ" trong bảng phụ đề trên điện thoại): cỡ chữ, viền, chữ đậm, màu (trắng / vàng / xanh nhạt / xám), nền tối sau chữ. Lưu cho lần sau.
+- **Điện thoại Android: hình trong hình (PiP).** Đang xem mà bấm Home là phim thu thành cửa sổ nhỏ; vuốt bỏ cửa sổ nhỏ thì phim tạm dừng.
+
 **Có gì mới trong 2.0.5**
 - **Phát mượt hơn trên TV box** (học theo mpv-android): giải mã không chép từng khung hình (khung hình đi thẳng vào GPU, phụ đề ASS / PGS vẫn hiện) và vẽ hình nhẹ (bộ phóng hình đơn giản, bỏ khử viền màu / dithering) cho GPU yếu như Mi Box S. Nếu phim không lên hình: màn hình chính TV → "Tương thích: bật" rồi mở lại app.
 - **Khớp tần số màn hình** (tuỳ chọn, màn hình chính TV): màn hình chuyển theo phim (24 / 25 / 30 Hz) khi phát, hết giật đều; màn hình có thể tối khoảng 1 giây khi chuyển. Cần TV / màn hình nhận được các chế độ đó.

@@ -23,8 +23,19 @@ import '../util/tv_mode.dart';
 class TvPlaybackPrefs {
   static const _compatKey = 'tv_compat_decode';
   static const _matchKey = 'tv_match_frame_rate';
+  static const _nativeKey = 'tv_native_player';
+  static const _tunnelKey = 'tv_tunneling';
   static bool _compat = false;
   static bool _match = false;
+  static bool _native = true;
+  static bool _tunnel = false;
+
+  /// Media3 player (NativePlayerActivity) instead of libmpv; on by default on TVs.
+  static bool get nativePlayer => available && _native;
+
+  /// Tunneled playback (Media3 only): video and audio synced by the TV chip. Smoother on some
+  /// boxes, broken on others, so off by default.
+  static bool get tunneling => _tunnel;
 
   static bool get available => Platform.isAndroid && isTvDevice;
   static bool get compat => _compat;
@@ -35,6 +46,18 @@ class TvPlaybackPrefs {
     final p = await SharedPreferences.getInstance();
     _compat = p.getBool(_compatKey) ?? false;
     _match = p.getBool(_matchKey) ?? false;
+    _native = p.getBool(_nativeKey) ?? true;
+    _tunnel = p.getBool(_tunnelKey) ?? false;
+  }
+
+  static Future<void> setNativePlayer(bool v) async {
+    _native = v;
+    await (await SharedPreferences.getInstance()).setBool(_nativeKey, v);
+  }
+
+  static Future<void> setTunneling(bool v) async {
+    _tunnel = v;
+    await (await SharedPreferences.getInstance()).setBool(_tunnelKey, v);
   }
 
   static Future<void> setCompat(bool v) async {

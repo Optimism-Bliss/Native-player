@@ -7,6 +7,7 @@ import 'package:media_kit/media_kit.dart';
 import '../../bridge.dart';
 import '../../util/format.dart';
 import '../playback_controller.dart';
+import 'subtitle_style_sheet.dart';
 
 String audioTrackLabel(AudioTrack t) {
   if (t.id == 'auto') return 'Tự động';
@@ -195,6 +196,15 @@ class _SubtitleSheetState extends State<_SubtitleSheet> {
                     label: Text(search.done ? 'Tìm lại' : 'Tìm online'),
                     visualDensity: VisualDensity.compact,
                     onPressed: search.loading ? null : _search,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 6),
+                    child: ActionChip(
+                      avatar: const Icon(IconsaxPlusLinear.text, size: 16),
+                      label: const Text('Kiểu chữ'),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => showSubtitleStyleSheet(context, c.player),
+                    ),
                   ),
                 ],
               ),
