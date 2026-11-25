@@ -1,4 +1,10 @@
-**Có gì mới trong 1.1.4** (cần server `1.7.0-dev.11`)
+**Có gì mới trong 1.1.5** (cần server `1.7.0-dev.12`)
+- **Chọn vai trò khi mở lần đầu:** "Điện thoại / máy tính" hay "TV" (Android). Đổi lại: menu điện thoại → "Dùng máy này làm TV"; trên TV → "Dùng như điện thoại".
+- **Gõ chữ cho TV từ điện thoại:** chọn ô nhập trên TV (tìm phim, tài khoản, mật khẩu, mã máy chủ), rồi trên điện thoại mở menu → "Điều khiển / gõ chữ trên TV".
+- **Đăng nhập trên TV bằng điện thoại:** trang đăng nhập có nút "📱 Đăng nhập bằng điện thoại"; TV hiện QR, điện thoại quét rồi bấm "Cho phép".
+- **TV tự nhận máy chủ** khi điện thoại ghép đôi (không phải gõ địa chỉ, địa chỉ vẫn được ẩn).
+
+**1.1.4** (cần server `1.7.0-dev.11`)
 - **Mã máy chủ:** admin vào Cài đặt → Tài khoản → "📱 Mã máy chủ cho app" để lấy mã `TBS1-…` và QR. Người dùng quét QR bằng camera hoặc dán mã thay cho địa chỉ; app sẽ hiện "Máy chủ riêng" thay cho domain ở mọi chỗ, nhật ký cũng che domain.
 - **🎲 Ngẫu nhiên** ở tab Phim / Series / JAV (không lẫn nhau, theo bộ lọc đang xem): xúc xắc lăn, rồi tự phát sau 5 giây.
 - **Tìm torrent thêm 6 nguồn:** Knaben, torrents-csv, LimeTorrents, RuTor, SubsPlease, Knaben JAV. Bản đã cache trên TorBox vẫn lên đầu và được kiểm nhanh hơn.
@@ -21,7 +27,7 @@
 
 Native TorBox STRM app: browse the TorBox STRM web UI and play in a libmpv player (Fladder-style controls).
 
-**Server:** needs TorBox STRM `1.7.0-dev.11` or later for everything above (`1.7.0-dev.5`+ for the in-app player).
+**Server:** needs TorBox STRM `1.7.0-dev.12` or later for everything above (`1.7.0-dev.5`+ for the in-app player).
 
 **Updates:** the app checks this page for new releases and installs them (Android asks for permission to install apps once). Builds from 0.4.3 on are signed with a fixed release key; if you installed 0.4.0–0.4.2, uninstall it once before installing this version.
 
