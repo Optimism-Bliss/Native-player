@@ -24,10 +24,31 @@ class _TvRemoteScreenState extends State<TvRemoteScreen> {
   double? _drag;
 
   TvSession get s => widget.session;
+  AppLifecycleListener? _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    // the phone's screen went off (or the app was in the background): the sync with the TV
+    // stopped; pick it up again as soon as the remote is back on screen
+    _lifecycle = AppLifecycleListener(onResume: _reconnect);
+    _reconnect();
+  }
+
+  @override
+  void dispose() {
+    _lifecycle?.dispose();
+    super.dispose();
+  }
+
+  void _reconnect() {
+    if (!s.running) unawaited(s.start().whenComplete(() => mounted ? setState(() {}) : null));
+  }
 
   Future<void> _cmd(String action, [Map<String, Object?> extra = const {}]) async {
     try {
       final st = await s.client.command(action, extra);
+      _reconnect();
       if (st != null && mounted) s.state.value = st;
     } on TvError catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
