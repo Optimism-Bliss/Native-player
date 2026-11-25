@@ -136,9 +136,10 @@ class _TvRemoteScreenState extends State<TvRemoteScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Text('TV không phát gì.', style: text.titleMedium, textAlign: TextAlign.center),
                   ),
+                // a field is selected on the TV: typing comes first (the phone keyboard opens by itself)
+                if (st.input != null) _TvKeyboard(session: s, field: st.input!),
                 _RemotePad(onKey: (k) => _cmd('key', {'key': k})),
                 const SizedBox(height: 16),
-                if (st.input != null) _TvKeyboard(session: s, field: st.input!),
                 if (!st.active && st.input == null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16),
