@@ -11,6 +11,8 @@ import '../player/player_screen.dart';
 import '../screens/browser_screen.dart';
 import '../screens/connect_screen.dart';
 import '../screens/role_screen.dart';
+import '../update/update_ui.dart';
+import '../update/updater.dart';
 import '../settings.dart';
 import '../util/tv_mode.dart';
 import '../util/log.dart';
@@ -44,10 +46,22 @@ class _TvHomeState extends State<TvHome> {
 
   bool _playerOpen = false;
   Timer? _addressTimer;
+  AppLifecycleListener? _lifecycle;
+  String _version = '';
 
   @override
   void initState() {
     super.initState();
+    // the TV start screen checks for updates too (the browser screen is not open on a TV most of the time)
+    Updater.currentVersion().then((v) => mounted ? setState(() => _version = v) : null);
+    Future<void>.delayed(const Duration(seconds: 3), () {
+      if (mounted && !_playerOpen) checkForUpdate(context, automatic: true);
+    });
+    _lifecycle = AppLifecycleListener(
+      onResume: () {
+        if (mounted && !_playerOpen) checkForUpdate(context, automatic: true);
+      },
+    );
     _rx.start().then((_) => mounted ? setState(() {}) : null);
     // Wi-Fi may come up after the app (or change): keep the QR address right.
     _addressTimer = Timer.periodic(const Duration(seconds: 15), (_) => _rx.refreshAddress());
@@ -55,6 +69,7 @@ class _TvHomeState extends State<TvHome> {
 
   @override
   void dispose() {
+    _lifecycle?.dispose();
     _addressTimer?.cancel();
     _rx.stop();
     super.dispose();
@@ -160,6 +175,7 @@ class _TvHomeState extends State<TvHome> {
                         const SizedBox(height: 28),
                         Wrap(
                           spacing: 16,
+                          runSpacing: 12,
                           children: [
                             FilledButton.icon(
                               autofocus: true,
@@ -195,6 +211,11 @@ class _TvHomeState extends State<TvHome> {
                               onPressed: _rx.newCode,
                               icon: const Icon(IconsaxPlusLinear.refresh),
                               label: const Text('Đổi mã'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () => checkForUpdate(context),
+                              icon: const Icon(IconsaxPlusLinear.refresh_circle),
+                              label: Text(_version.isEmpty ? 'Kiểm tra cập nhật' : 'Cập nhật (đang dùng $_version)'),
                             ),
                           ],
                         ),
