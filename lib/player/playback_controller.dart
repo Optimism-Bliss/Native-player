@@ -42,6 +42,18 @@ class PlayerHost {
   /// The shared player if one was created (quitting must not start libmpv).
   static Future<PlayerHost>? get existing => _instance;
 
+  /// TV decoding mode changed in settings: switch libmpv's decoder in place (takes effect from
+  /// the next file), so no app restart is needed.
+  static Future<void> applyDecodeMode() async {
+    final pending = _instance;
+    if (pending == null) return; // not created yet: _create() reads the setting
+    final native = (await pending).player.platform;
+    if (native is! NativePlayer) return;
+    final hwdec = TvPlaybackPrefs.zeroCopy ? 'mediacodec,mediacodec-copy' : 'mediacodec-copy';
+    await native.setProperty('hwdec', hwdec);
+    appLog('player: decoding -> $hwdec');
+  }
+
   static Future<PlayerHost> _create() async {
     MediaKit.ensureInitialized();
     final player = Player(

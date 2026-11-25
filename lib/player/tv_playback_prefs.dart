@@ -19,7 +19,7 @@ import '../util/tv_mode.dart';
 ///   rate (24p film on a 24/48 Hz mode) while the player is open. Needs a TV or
 ///   monitor that accepts those modes; the screen may go dark for about a second.
 ///
-/// The video output is created once per run: [compat] applies after reopening the app.
+/// [compat] switches libmpv's hwdec in place (PlayerHost.applyDecodeMode), from the next film.
 class TvPlaybackPrefs {
   static const _compatKey = 'tv_compat_decode';
   static const _matchKey = 'tv_match_frame_rate';

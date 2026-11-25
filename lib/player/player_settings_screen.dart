@@ -7,6 +7,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../util/tv_mode.dart';
 import 'pip.dart';
+import 'playback_controller.dart';
 import 'player_settings.dart';
 import 'subtitle_style.dart';
 import 'tv_playback_prefs.dart';
@@ -216,10 +217,11 @@ class _PlayerSettingsScreenState extends State<PlayerSettingsScreen> {
             if (!TvPlaybackPrefs.nativePlayer)
               _switch(
                 'Tương thích (mpv)',
-                'Chép từng khung hình; dùng khi phim không lên hình. Mở lại app để áp dụng.',
+                'Chép từng khung hình; dùng khi phim không lên hình. Áp dụng từ phim tiếp theo.',
                 TvPlaybackPrefs.compat,
                 (v) async {
                   await TvPlaybackPrefs.setCompat(v);
+                  await PlayerHost.applyDecodeMode();
                   setState(() {});
                 },
                 icon: IconsaxPlusLinear.cpu_setting,
