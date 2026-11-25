@@ -89,8 +89,12 @@ class Updater {
         ..set(HttpHeaders.userAgentHeader, 'TorBoxSTRM-app');
       final res = await req.close().timeout(const Duration(seconds: 15));
       if (res.statusCode != 200) {
-        appLog('update check: HTTP ${res.statusCode}');
-        return null;
+        // 403/429: GitHub allows 60 API calls an hour per IP, and phones on
+        // mobile data share their IP with many others. The release page
+        // itself is not rate limited.
+        appLog('update check: HTTP ${res.statusCode}, reading the release page');
+        await res.drain<void>();
+        return await _latestFromPage(client);
       }
       final body = jsonDecode(await res.transform(utf8.decoder).join()) as List;
       final suffix = assetSuffix();
@@ -123,6 +127,37 @@ class Updater {
     } finally {
       client.close(force: true);
     }
+  }
+
+  /// `github.com/<repo>/releases/latest` redirects to the newest full
+  /// release's tag; asset names are fixed, so the download link follows.
+  static Future<AppRelease?> _latestFromPage(HttpClient client) async {
+    final req = await client.getUrl(Uri.parse('https://github.com/$updateRepo/releases/latest'));
+    req
+      ..followRedirects = false
+      ..headers.set(HttpHeaders.userAgentHeader, 'TorBoxSTRM-app');
+    final res = await req.close().timeout(const Duration(seconds: 15));
+    await res.drain<void>();
+    final location = res.headers.value(HttpHeaders.locationHeader);
+    final tag = location == null ? null : RegExp(r'/releases/tag/([^/?#]+)').firstMatch(location)?.group(1);
+    if (tag == null) {
+      appLog('update check: no release in the page redirect (HTTP ${res.statusCode})');
+      return null;
+    }
+    final suffix = assetSuffix();
+    return AppRelease(
+      version: parseVersion(tag),
+      tag: tag,
+      notes: '',
+      page: Uri.parse('https://github.com/$updateRepo/releases/tag/$tag'),
+      asset: suffix == null
+          ? null
+          : ReleaseAsset(
+              name: 'TorBox-STRM-$suffix',
+              url: Uri.parse('https://github.com/$updateRepo/releases/download/$tag/TorBox-STRM-$suffix'),
+              size: 0,
+            ),
+    );
   }
 
   /// Release newer than this build, or null. With [automatic], respects

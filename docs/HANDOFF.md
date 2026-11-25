@@ -103,6 +103,16 @@ Cần đo trên máy thật để biết thời gian còn lại nằm ở đâu:
 - **Menu của app trên điện thoại:** trước chỉ mở bằng Back ở trang đầu. Giờ thêm mục "📱 Ứng dụng (cập nhật, máy chủ, TV)" trong menu tài khoản của trang web (chỉ hiện trong app); trang gửi `{type:'menu'}` qua cầu nối.
 - Đã thử trên Linux: mục Ứng dụng mở bảng menu; chế độ cửa sổ web: app ẩn, ▶ toàn màn hình, Esc về cửa sổ web.
 
+## Đo trên điện thoại thật (1.1.3, 2026-11-25)
+
+Có hình sau 2,7 s (tập đang xem dở, đã xin sẵn link) / 6,0 s / 9,8 s (Remux FLAC) / 15,1 s (E03, chưa xin sẵn link). Danh sách phụ đề 3–8 s (chờ AIOStreams). Phụ đề nạp sau 12 s (phải chờ file mở xong). `update check: HTTP 403`: API GitHub giới hạn 60 lượt/giờ cho mỗi IP, mạng di động dùng chung IP.
+
+Đã sửa cho bản sau:
+- Cập nhật: khi API trả lỗi, app đọc chuyển hướng của `github.com/<repo>/releases/latest` để lấy tag, rồi tải `releases/download/<tag>/TorBox-STRM-<abi>`. Đã thử với GitHub thật.
+- Mở trang phim thì tải sẵn cả danh sách phụ đề (giữ 10 phút), không chỉ link.
+- Khi tập đang xem qua 70%, trang xin sẵn link và phụ đề cho tập kế trong hàng đợi.
+- Còn cần log server (`mở /s … ms=…`, có `qua proxy VPS` không) để biết 6–15 s còn lại nằm ở TorBox, CDN hay mpv.
+
 ## Làm sau
 
 Từ bản rà soát mô tả bàn giao ban đầu:
