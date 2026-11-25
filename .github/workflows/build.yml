@@ -193,7 +193,7 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" release-assets/*.apk --clobber
           else
-            gh release create "$TAG" release-assets/*.apk --prerelease --verify-tag \
+            gh release create "$TAG" release-assets/*.apk --latest --verify-tag \
               --title "TorBox STRM $TAG" --notes "$notes"
           fi
 
