@@ -1,3 +1,9 @@
+**Có gì mới trong 1.1.1**
+- Android: trang trong app hiển thị giống Chrome (hết khoảng trống lớn, chữ không bị phóng to).
+- Windows: bấm ▶ mở được player trong app; nếu trang không lên thì báo lỗi rõ ràng, có mục **Nhật ký** trong menu.
+- **Phát trên TV** (thử nghiệm): cài app lên Android TV, quét mã QR trên TV bằng điện thoại, rồi bấm ▶ → "Phát trên TV". Điện thoại thành remote. TV và điện thoại phải cùng mạng Wi-Fi.
+- Nhận diện thư viện khi phát từ AIOStreams cần server `1.7.0-dev.8`.
+
 Native TorBox STRM app: browse the TorBox STRM web UI and play in a libmpv player (Fladder-style controls).
 
 **Server:** needs TorBox STRM `1.7.0-dev.5` or later, which carries the in-app player bridge.

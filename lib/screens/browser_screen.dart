@@ -274,7 +274,17 @@ class _BrowserScreenState extends State<BrowserScreen> {
         onCall: _onBridgeCall,
         accessPolicy: WebViewJavaScriptAccessPolicy.origins({_origin}),
       );
-      if (!ok) appLog('bridge handler could not be registered with an origin policy');
+      if (ok) return;
+      // WebView2 (Windows) cannot enforce an origin policy natively, so the
+      // handler is refused. Register it without one; _onBridgeCall checks the
+      // caller itself (origin from the URL WebView2 reports for the page).
+      appLog('bridge: origin policy unsupported here, checking callers in the app');
+      final fallback = await _web.addJavaScriptHandler(
+        bridgeHandlerName,
+        onCall: _onBridgeCall,
+        accessPolicy: const WebViewJavaScriptAccessPolicy.unrestricted(),
+      );
+      if (!fallback) appLog('bridge handler could not be registered');
     });
     await step('script', () async {
       await _web.tryAddUserScript(
@@ -326,6 +336,12 @@ class _BrowserScreenState extends State<BrowserScreen> {
         );
       }
     }
+  }
+
+  static String? _originOf(String? url) {
+    final u = url == null ? null : Uri.tryParse(url);
+    if (u == null || (u.scheme != 'https' && u.scheme != 'http') || u.host.isEmpty) return null;
+    return u.origin;
   }
 
   Future<void> _showLog() async {
@@ -428,8 +444,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
   }
 
   Object? _onBridgeCall(WebViewJavaScriptCall call) {
-    // The access policy already enforces origin + main frame natively; check again.
-    if (call.isMainFrame != true || call.sourceOrigin != _origin) {
+    // Native access policy where the platform has one; always checked here too.
+    final origin = call.sourceOrigin ?? _originOf(call.sourceUrl);
+    if (call.isMainFrame != true || origin != _origin) {
+      appLog('bridge: refused a call from ${origin ?? 'an unknown page'}');
       return {'ok': false, 'error': 'Nguồn lệnh không được phép'};
     }
     final raw = call.arguments.isEmpty ? null : call.arguments.first;
