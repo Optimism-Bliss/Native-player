@@ -5,7 +5,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../bridge.dart';
-import '../player/decode_prefs.dart';
 import '../player/playback_controller.dart';
 import '../player/player_screen.dart';
 import '../screens/browser_screen.dart';
@@ -201,18 +200,6 @@ class _TvHomeState extends State<TvHome> {
                               },
                               icon: const Icon(IconsaxPlusLinear.mobile),
                               label: const Text('Dùng như điện thoại'),
-                            ),
-                            OutlinedButton.icon(
-                              onPressed: () async {
-                                await DecodePrefs.set(!DecodePrefs.direct);
-                                if (!context.mounted) return;
-                                setState(() {});
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Đã đổi cách giải mã. Mở lại app để áp dụng.')),
-                                );
-                              },
-                              icon: const Icon(IconsaxPlusLinear.cpu),
-                              label: Text(DecodePrefs.direct ? 'Giải mã: trực tiếp' : 'Giải mã: GPU'),
                             ),
                             OutlinedButton.icon(
                               onPressed: _rx.newCode,

@@ -535,7 +535,7 @@ Future<void> showPlaybackInfo(BuildContext context, Player player, ActiveTracks 
     ('Màu', [v.primaries, v.gamma, v.colormatrix].whereType<String>().join(' · ')),
     ('Tín hiệu HDR', hdrLabel(v.primaries, v.gamma).isEmpty ? 'SDR' : hdrLabel(v.primaries, v.gamma)),
     ('Giải mã phần cứng', hwdec.isEmpty || hwdec == 'no' ? 'Không (giải mã mềm)' : hwdec),
-    ('Video output', vo == 'mediacodec_embed' ? 'Trực tiếp (mediacodec_embed)' : vo),
+    ('Video output', vo),
     (
       'Khung hình',
       [

@@ -12,7 +12,6 @@ import 'package:webview_all_android/webview_all_android.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../bridge.dart';
-import '../player/decode_prefs.dart';
 import '../player/playback_controller.dart';
 import '../player/player_screen.dart';
 import '../connect_code.dart';
@@ -799,12 +798,6 @@ class _BrowserScreenState extends State<BrowserScreen> {
                   if (QrScanScreen.available && !isTvDevice)
                     ('scan', IconsaxPlusLinear.scan_barcode, 'Quét mã QR (ghép TV, đăng nhập TV, mã máy chủ)'),
                   if (Platform.isAndroid) ('role', IconsaxPlusLinear.monitor_mobbile, 'Dùng máy này làm TV'),
-                  if (DecodePrefs.available)
-                    (
-                      'decode',
-                      IconsaxPlusLinear.cpu,
-                      DecodePrefs.direct ? 'Giải mã: trực tiếp (đổi sang GPU)' : 'Giải mã: GPU (đổi sang trực tiếp)',
-                    ),
                   ('quit', IconsaxPlusLinear.close_circle, 'Thoát app'),
                 ])
                   ListTile(leading: Icon(icon), title: Text(label), onTap: () => Navigator.pop(context, value)),
@@ -837,19 +830,6 @@ class _BrowserScreenState extends State<BrowserScreen> {
         }
       case 'scan':
         await _scanQr();
-      case 'decode':
-        await DecodePrefs.set(!DecodePrefs.direct);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                DecodePrefs.direct
-                    ? 'Giải mã trực tiếp: mượt hơn trên TV box, phụ đề hiện dạng chữ thường. Mở lại app để áp dụng.'
-                    : 'Giải mã qua GPU: phụ đề ASS đủ kiểu chữ. Mở lại app để áp dụng.',
-              ),
-            ),
-          );
-        }
       case 'quit':
         await SystemNavigatorPop.pop();
       default:

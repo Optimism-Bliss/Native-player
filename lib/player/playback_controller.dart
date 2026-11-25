@@ -7,7 +7,6 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import '../bridge.dart';
 import '../util/tv_mode.dart';
-import 'decode_prefs.dart';
 import '../util/log.dart';
 import '../util/format.dart';
 
@@ -49,13 +48,9 @@ class PlayerHost {
         logLevel: MPVLogLevel.warn,
       ),
     );
-    final direct = DecodePrefs.direct;
-    appLog('player: ${direct ? 'direct decode (mediacodec_embed)' : 'gpu output'}');
     final video = VideoController(
       player,
-      configuration: direct
-          ? const VideoControllerConfiguration(vo: 'mediacodec_embed', hwdec: 'mediacodec')
-          : const VideoControllerConfiguration(enableHardwareAcceleration: true),
+      configuration: const VideoControllerConfiguration(enableHardwareAcceleration: true),
     );
     final host = PlayerHost._(player, video);
     // libmpv's own warnings and errors (video output, decoder, network) into the app log: a black
@@ -80,6 +75,23 @@ class PlayerHost {
       await native.setProperty('demuxer-max-back-bytes', isTvDevice ? '16M' : '50M');
       await native.setProperty('network-timeout', '60');
       await native.setProperty('stream-buffer-size', '4M');
+      if (isTvDevice) {
+        // TV boxes have weak GPUs (Mi Box S: Mali-450): mpv's light rendering, as its "fast" profile.
+        // High-quality scalers, debanding and dithering cost GPU time and look the same on a TV.
+        for (final (k, v) in const [
+          ('scale', 'bilinear'),
+          ('dscale', 'bilinear'),
+          ('cscale', 'bilinear'),
+          ('dither-depth', 'no'),
+          ('deband', 'no'),
+          ('correct-downscaling', 'no'),
+          ('linear-downscaling', 'no'),
+          ('sigmoid-upscaling', 'no'),
+          ('hdr-compute-peak', 'no'),
+        ]) {
+          await native.setProperty(k, v);
+        }
+      }
       // When the cache runs dry, wait for a few seconds of data before playing on: one longer
       // wait instead of a stop every second on a link that is barely fast enough.
       await native.setProperty('cache-pause-wait', '3');

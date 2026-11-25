@@ -20,7 +20,6 @@ import 'util/fullscreen.dart';
 import 'util/links.dart';
 import 'util/log.dart';
 import 'util/tv_mode.dart';
-import 'player/decode_prefs.dart';
 
 Future<void> main() async {
   runZonedGuarded(_start, (error, stack) => appLog('uncaught: $error\n$stack'));
@@ -61,16 +60,13 @@ Future<void> _start() async {
   }
   if (Platform.isWindows) await prepareWindowsWebView();
   await detectTv();
-  await DecodePrefs.load();
   if (Platform.isAndroid) {
     // which build runs where, how much RAM is free, and why the previous run ended
     // (a TV box killed for memory leaves no error of its own in this log)
     try {
       final version = (await PackageInfo.fromPlatform()).version;
       final info = await const MethodChannel('torboxstrm/intent').invokeMethod<String>('startInfo');
-      appLog(
-        'start info: app $version, ${isTvDevice ? 'TV' : 'phone'}${DecodePrefs.direct ? ', direct decode' : ''}; $info',
-      );
+      appLog('start info: app $version, ${isTvDevice ? 'TV' : 'phone'}; $info');
     } catch (e) {
       appLog('start info: $e');
     }

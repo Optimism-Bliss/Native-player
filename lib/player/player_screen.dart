@@ -9,14 +9,12 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import '../bridge.dart';
 import '../util/device_controls.dart';
-import '../util/log.dart';
 import '../util/format.dart';
 import '../util/fullscreen.dart';
 import '../util/tv_mode.dart';
 import 'playback_controller.dart';
 import 'widgets/progress_bar.dart';
 import 'widgets/track_sheets.dart';
-import 'decode_prefs.dart';
 
 /// Full-screen player. Layout and interactions follow Fladder's DesktopControls:
 /// gradient top bar with the title, a bottom panel with progress, info chips,
@@ -547,11 +545,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
             fill: Colors.black,
             fit: _fit.boxFit,
             aspectRatio: _fit.aspectRatio,
-            // libass renders every subtitle format inside mpv (styled ASS included); with direct
-            // decoding mpv cannot draw on the picture: _DirectSubtitles shows the text instead.
+            // libass renders every subtitle format inside mpv (styled ASS included).
             subtitleViewConfiguration: const SubtitleViewConfiguration(visible: false),
           ),
-          if (DecodePrefs.direct) _DirectSubtitles(controller: c, raised: _overlay),
           _gestureLayer(),
           _centerStatus(),
           IgnorePointer(
@@ -1204,103 +1200,6 @@ class _Title extends StatelessWidget {
         const SizedBox(height: 4),
         Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: text.titleSmall),
       ],
-    );
-  }
-}
-
-/// Subtitles in direct decoding mode: MediaCodec draws straight to the screen,
-/// so mpv (libass) cannot paint on the picture. The text of the current line
-/// (`sub-text`, plain text for SRT / ASS / WebVTT) is drawn here, above the
-/// video. Picture-based subtitles (PGS, VobSub, DVB) have no text: a notice
-/// says so instead of showing nothing.
-class _DirectSubtitles extends StatefulWidget {
-  const _DirectSubtitles({required this.controller, required this.raised});
-  final PlaybackController controller;
-  final bool raised;
-
-  @override
-  State<_DirectSubtitles> createState() => _DirectSubtitlesState();
-}
-
-class _DirectSubtitlesState extends State<_DirectSubtitles> {
-  static const _pictureCodecs = {
-    'hdmv_pgs_subtitle',
-    'pgssub',
-    'dvd_subtitle',
-    'dvdsub',
-    'dvb_subtitle',
-    'dvbsub',
-    'xsub',
-  };
-  String _logged = '';
-  bool _shownText = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = widget.controller;
-    return IgnorePointer(
-      child: ValueListenableBuilder<ActiveTracks>(
-        valueListenable: c.active,
-        builder: (context, active, _) {
-          final track = active.subtitleOf(c.player.state.tracks);
-          final codec = (track?.codec ?? '').toLowerCase();
-          final key = '${track?.id}|$codec';
-          if (track != null && key != _logged) {
-            _logged = key;
-            _shownText = false;
-            appLog('subs: track ${track.id} ${track.title ?? ''} ${track.language ?? ''} codec=$codec (direct output)');
-          }
-          final picture = _pictureCodecs.contains(codec);
-          return StreamBuilder<List<String>>(
-            stream: c.player.stream.subtitle,
-            initialData: c.player.state.subtitle,
-            builder: (context, snap) {
-              final text = picture ? '' : (snap.data ?? const []).where((t) => t.trim().isNotEmpty).join('\n').trim();
-              if (text.isNotEmpty && !_shownText) {
-                _shownText = true;
-                appLog('subs: first line shown');
-              }
-              final size = MediaQuery.sizeOf(context);
-              final style = TextStyle(
-                fontSize: (size.height * 0.048).clamp(16.0, 46.0),
-                height: 1.25,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-                shadows: const [
-                  Shadow(blurRadius: 3, color: Colors.black),
-                  Shadow(offset: Offset(1.5, 1.5), blurRadius: 2, color: Colors.black),
-                  Shadow(offset: Offset(-1.5, -1.5), blurRadius: 2, color: Colors.black),
-                ],
-              );
-              final message = picture
-                  ? 'Phụ đề dạng ảnh (${codec.toUpperCase()}) không hiện được khi giải mã trực tiếp. '
-                        'Chọn phụ đề khác, hoặc đổi "Giải mã" sang GPU.'
-                  : null;
-              if (text.isEmpty && message == null) return const SizedBox.shrink();
-              return Align(
-                alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    size.width * 0.08,
-                    0,
-                    size.width * 0.08,
-                    widget.raised ? 150 : size.height * 0.07,
-                  ),
-                  child: message != null
-                      ? DecoratedBox(
-                          decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            child: Text(message, textAlign: TextAlign.center, style: style.copyWith(fontSize: 16)),
-                          ),
-                        )
-                      : Text(text, textAlign: TextAlign.center, style: style),
-                ),
-              );
-            },
-          );
-        },
-      ),
     );
   }
 }
