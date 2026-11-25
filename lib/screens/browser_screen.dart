@@ -341,7 +341,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
     await step('script', () async {
       await _web.tryAddUserScript(
         WebViewUserScript(
-          source: 'window.TorBoxStrmApp=Object.freeze({v:$bridgeVersion,platform:${jsonEncode(_platform)}});',
+          source:
+              'window.TorBoxStrmApp=Object.freeze({v:$bridgeVersion,platform:${jsonEncode(_platform)},tv:$isTvDevice});',
         ),
       );
     });
@@ -710,7 +711,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
               Expanded(
                 child: Stack(
                   children: [
-                    if (_external) _windowPanel(context) else WebViewWidget(controller: _web),
+                    if (_external) _windowPanel(context) else _webView(),
                     if (!_external && _progress < 100)
                       Positioned(
                         top: 0,
@@ -760,6 +761,27 @@ class _BrowserScreenState extends State<BrowserScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  /// On a TV the remote's arrows and OK belong to the page (its own TV mode
+  /// moves focus between cards); Flutter's default shortcuts would take them
+  /// for widget focus traversal instead. DoNothingAndStopPropagationIntent
+  /// leaves the key unhandled, so it reaches the WebView.
+  Widget _webView() {
+    final view = WebViewWidget(controller: _web);
+    if (!isTvDevice) return view;
+    const pass = DoNothingAndStopPropagationIntent();
+    return Shortcuts(
+      shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.arrowUp): pass,
+        SingleActivator(LogicalKeyboardKey.arrowDown): pass,
+        SingleActivator(LogicalKeyboardKey.arrowLeft): pass,
+        SingleActivator(LogicalKeyboardKey.arrowRight): pass,
+        SingleActivator(LogicalKeyboardKey.select): pass,
+        SingleActivator(LogicalKeyboardKey.enter): pass,
+      },
+      child: view,
     );
   }
 
