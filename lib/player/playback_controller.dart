@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../bridge.dart';
+import '../util/log.dart';
 import '../util/format.dart';
 
 typedef ProgressCallback = void Function(String key, Duration position, Duration duration);
@@ -164,6 +165,11 @@ class PlaybackController {
       ..add(
         player.stream.duration.listen((d) {
           if (d > Duration.zero) _lastDuration = d;
+          if (d > Duration.zero && !_loadedLogged) {
+            _loadedLogged = true;
+            appLog('play: file opened after $_t');
+            if (!_fileLoaded.isCompleted) _fileLoaded.complete(true);
+          }
         }),
       )
       ..add(
@@ -210,11 +216,19 @@ class PlaybackController {
     if (search.value.key != item.key) search.value = const SubtitleSearchState();
     _serverTitle = null;
     _serverTitles.clear();
-    await player.open(Media(item.url.toString(), start: start > Duration.zero ? start : null));
     // Ask the page for this file's subtitles (list + the one to turn on, the
-    // same choice the web player would make). It answers with subs/subText.
+    // same choice the web player would make) while mpv opens the file; it
+    // answers with subs/subText, which wait for the file before loading.
     final link = page;
     if (link != null) unawaited(link.send({'type': 'subs', 'key': item.key}));
+    _watch
+      ..reset()
+      ..start();
+    _loadedLogged = _playingLogged = false;
+    if (!_fileLoaded.isCompleted) _fileLoaded.complete(false);
+    _fileLoaded = Completer<bool>();
+    appLog('play: open "${item.title}"${start > Duration.zero ? ' at ${start.inSeconds}s' : ''}');
+    await player.open(Media(item.url.toString(), start: start > Duration.zero ? start : null));
     // Reopened after an error with a device subtitle on: load it again.
     final local = localSubtitles.value.where((l) => l.id == reopenLocal).firstOrNull;
     if (local != null) unawaited(selectLocalSubtitle(local));
@@ -230,8 +244,23 @@ class PlaybackController {
     await player.setSubtitleTrack(SubtitleTrack.uri(sub.url.toString(), title: sub.label, language: sub.language));
   }
 
+  /// Time since the current file was opened, for the log (where does startup time go).
+  final Stopwatch _watch = Stopwatch();
+  bool _loadedLogged = false;
+
+  /// Completes when the file opened by the latest [_open] is loaded (true), or
+  /// false when another open replaced it. The shared player still reports the
+  /// previous file's duration until then, so it cannot be used as the signal.
+  Completer<bool> _fileLoaded = Completer<bool>();
+  bool _playingLogged = false;
+  String get _t => '${_watch.elapsedMilliseconds} ms';
+
   void _onBuffering(bool buffering) {
     _stallTimer?.cancel();
+    if (!buffering && !_playingLogged && player.state.duration > Duration.zero) {
+      _playingLogged = true;
+      appLog('play: picture after $_t');
+    }
     if (!buffering) {
       if (recovering.value) recovering.value = false;
       return;
@@ -314,6 +343,7 @@ class PlaybackController {
     if (_disposed) return;
     if (message is SubtitleList) {
       if (message.key != current.key) return;
+      appLog('subs: list (${message.list.length}) after $_t');
       serverSubtitles.value = message.list;
       if (message.languages.isNotEmpty) subtitleLanguages = message.languages;
       final prefer = message.byId(message.preferId);
@@ -353,15 +383,14 @@ class PlaybackController {
 
   Future<void> _loadServerSubtitle(SubtitleText sub) async {
     final generation = _openGeneration;
-    // Subtitles can only be added once the file is loaded.
-    if (player.state.duration <= Duration.zero) {
-      try {
-        await player.stream.duration.firstWhere((d) => d > Duration.zero).timeout(const Duration(seconds: 45));
-      } on TimeoutException {
-        return;
-      }
+    // Subtitles can only be added once this file (not the previous one) is loaded.
+    try {
+      if (!await _fileLoaded.future.timeout(const Duration(seconds: 45))) return;
+    } on TimeoutException {
+      return;
     }
     if (_disposed || generation != _openGeneration) return;
+    appLog('subs: "${sub.label}" loaded after $_t');
     // Tracks loaded from the server are recognised by their title.
     _serverTitle = sub.label;
     _serverTitles.add(sub.label);

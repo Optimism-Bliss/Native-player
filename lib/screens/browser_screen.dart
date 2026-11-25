@@ -632,6 +632,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
               ('server', IconsaxPlusLinear.global_edit, 'Đổi máy chủ'),
               ('signout', IconsaxPlusLinear.logout, 'Đăng xuất'),
               ('update', IconsaxPlusLinear.refresh_circle, 'Kiểm tra cập nhật'),
+              ('log', IconsaxPlusLinear.document_text, 'Nhật ký'),
               ('quit', IconsaxPlusLinear.close_circle, 'Thoát app'),
             ])
               ListTile(leading: Icon(icon), title: Text(label), onTap: () => Navigator.pop(context, value)),
@@ -651,6 +652,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
         await _signOut();
       case 'update':
         if (mounted) await checkForUpdate(context);
+      case 'log':
+        await _showLog();
       case 'quit':
         await SystemNavigatorPop.pop();
       default:

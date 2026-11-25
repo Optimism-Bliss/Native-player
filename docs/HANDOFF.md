@@ -79,6 +79,23 @@ Chạm: hiện/ẩn điều khiển. Chạm đúp trái/phải: ±10 giây, gi�
   - Đã kiểm thử: `test/tv_test.dart` (ghép đôi, sai mã, mã dùng một lần, token lạ, kiểm tra lệnh phát, chuyển tiếp phụ đề, poll). Trên Linux với `TORBOXSTRM_TV=1` (chạy bản desktop như TV) + `curl` đóng vai điện thoại: trang QR, ghép đôi, phát hàng đợi 2 tập từ backend thử, tạm dừng/tua/lùi/đổi âm thanh/tập sau, phím ▶ OK Back, sự kiện `closed`.
   - Chưa kiểm thử: điện thoại thật → TV box thật (camera mở link, intent mở app, Wi-Fi tách khách/AP isolation), focus D-pad trong các bảng chọn track, banner trên launcher TV. Lưu lượng LAN là HTTP không mã hoá (token đi kèm mỗi lệnh); chỉ dùng trong mạng nhà.
 
+## Bản tiếp theo (chưa build): bấm ▶ đến khi có hình mất 15–20 s, phụ đề lâu
+
+Các việc đã gây chậm:
+- Link CDN chỉ được xin lúc player mở `/s/`, và mỗi lần đều phải gọi TorBox.
+- Trang chờ logo TMDB tối đa 2 s mới gửi lệnh phát.
+- `/api/subs` hỏi TorBox (phụ đề trong torrent) rồi mới hỏi AIOStreams (tối đa 8 s), nối tiếp nhau. App chỉ xin danh sách phụ đề sau khi đã mở file.
+- Nếu link TorBox chứa API key, chế độ `STREAM_MODE=auto` phục vụ qua proxy VPS. Khi đó mọi lần đọc và tua đều đi qua VPS.
+
+Đã sửa:
+- Mở trang chi tiết trong app thì gọi `POST /api/prewarm?key=` (file đang xem dở hoặc tập/bản đầu) và tải sẵn logo. Lúc bấm ▶, trang tải trước `/api/subs`.
+- Server chạy hai nguồn phụ đề song song, và ghi log `danh sách phụ đề ms=…`, `mở /s: chuyển thẳng tới CDN ms=…` hoặc `mở /s: qua proxy VPS`.
+- App xin phụ đề cùng lúc với lúc mở file. Phụ đề chỉ được nạp khi đúng file mới đã mở (`_fileLoaded`; player dùng chung nên thời lượng của file cũ không dùng làm tín hiệu được). Nhật ký ghi `play: open`, `play: file opened after`, `play: picture after`, `subs: list after`, `subs: … loaded after`.
+- Android giờ cũng có mục **Nhật ký** trong menu.
+- Trên Linux với TorBox giả: phụ đề về sau 43 ms, `/s` 0 ms, có hình sau 0,9 s.
+
+Cần đo trên máy thật để biết thời gian còn lại nằm ở đâu: TorBox, CDN, proxy, hay mpv tua tới vị trí xem dở trên file MKV lớn.
+
 ## Làm sau
 
 Từ bản rà soát mô tả bàn giao ban đầu:

@@ -4,10 +4,14 @@ import 'package:flutter/foundation.dart';
 
 import 'fullscreen.dart';
 
+/// Android: set at start-up (app files folder) so the log can be read in the app.
+String? androidLogDir;
+
 /// Desktop builds have no console, so problems are also written to
 /// %LOCALAPPDATA%\TorBoxSTRM\torbox-strm.log (Windows) or
 /// ~/.local/state/torbox-strm.log (Linux). Android uses logcat.
 String get logFilePath {
+  if (androidLogDir != null) return '$androidLogDir/torbox-strm.log';
   final dir = Platform.isWindows
       ? '${Platform.environment['LOCALAPPDATA']}\\TorBoxSTRM'
       : '${Platform.environment['HOME']}/.local/state';
@@ -26,7 +30,7 @@ String readLogTail([int lines = 200]) {
 
 void appLog(String message) {
   debugPrint(message);
-  if (!isDesktop) return;
+  if (!isDesktop && androidLogDir == null) return;
   try {
     final file = File(logFilePath);
     file.parent.createSync(recursive: true);
