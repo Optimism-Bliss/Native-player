@@ -26,6 +26,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Quét mã QR để ghép TV, đăng nhập TV và nhập mã máy chủ.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>TorBox STRM kết nối với máy chủ và TV trong mạng nhà bạn.</string>
 	<key>UIBackgroundModes</key>

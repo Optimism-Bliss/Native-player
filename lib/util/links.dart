@@ -53,3 +53,21 @@ String? deviceLoginCode(String raw) {
   final c = (u.queryParameters['c'] ?? '').toUpperCase();
   return RegExp(r'^[A-Z0-9]{4}-[A-Z0-9]{4}$').hasMatch(c) ? c : null;
 }
+
+/// A QR code read by the in-app scanner, as the `torboxstrm://` link the app
+/// handles: pairing / server / TV-login links as they are, a TV login page
+/// (`https://…/device?c=CODE`) and a bare server code (`TBS1-…`) too. null
+/// when it is not one of ours.
+String? appLinkFromScan(String raw) {
+  final t = raw.trim();
+  final u = Uri.tryParse(t);
+  if (u != null && u.scheme == 'torboxstrm') return t;
+  if (u != null && (u.scheme == 'https' || u.scheme == 'http') && u.path == '/device') {
+    final c = deviceLoginCode('torboxstrm://device?c=${u.queryParameters['c'] ?? ''}');
+    if (c != null) return 'torboxstrm://device?c=$c';
+  }
+  if (RegExp(r'^TBS1-[0-9A-Z-]+$', caseSensitive: false).hasMatch(t)) {
+    return Uri(scheme: 'torboxstrm', host: 'connect', queryParameters: {'c': t.toUpperCase()}).toString();
+  }
+  return null;
+}

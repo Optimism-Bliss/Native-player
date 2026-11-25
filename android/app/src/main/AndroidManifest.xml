@@ -1,6 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+    <!-- in-app QR scanner (pairing, TV login, server code); TV boxes without a camera still install -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <!-- Android TV: listed in the TV launcher, no touch screen needed. -->
     <uses-feature android:name="android.software.leanback" android:required="false"/>
     <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
@@ -42,6 +45,8 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="torboxstrm" android:host="pair"/>
                 <data android:scheme="torboxstrm" android:host="connect"/>
+                <!-- a TV's login QR: approve it in this signed-in app -->
+                <data android:scheme="torboxstrm" android:host="device"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

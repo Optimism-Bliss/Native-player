@@ -9,6 +9,7 @@ import '../tv/tv_input.dart';
 import '../util/tv_mode.dart';
 import '../util/links.dart';
 import 'browser_screen.dart';
+import 'qr_scan_screen.dart';
 
 /// First run (or "change server"): ask for the TorBox STRM address and check
 /// it answers `/health`. Login itself happens in the web UI afterwards.
@@ -78,6 +79,22 @@ class _ConnectScreenState extends State<ConnectScreen> {
     _links?.cancel();
     _url.dispose();
     super.dispose();
+  }
+
+  /// Server QR (torboxstrm://connect?c=TBS1-…) or a printed address, read with the camera.
+  Future<void> _scan() async {
+    final raw = await QrScanScreen.scan(context, title: 'Quét mã máy chủ');
+    if (raw == null || !mounted) return;
+    final link = appLinkFromScan(raw);
+    final code = link == null ? null : codeFromLink(link);
+    final value = code ?? (Uri.tryParse(raw)?.hasScheme == true && raw.startsWith('http') ? raw : null);
+    if (value == null) {
+      setState(() => _error = 'Mã QR này không phải mã máy chủ TorBox STRM.');
+      return;
+    }
+    _url.text = value;
+    setState(() => _error = null);
+    await _connect();
   }
 
   Future<void> _connect() async {
@@ -161,6 +178,13 @@ class _ConnectScreenState extends State<ConnectScreen> {
                     border: const OutlineInputBorder(),
                     errorText: _error,
                     errorMaxLines: 3,
+                    suffixIcon: QrScanScreen.available && !isTvDevice
+                        ? IconButton(
+                            tooltip: 'Quét QR mã máy chủ',
+                            icon: const Icon(IconsaxPlusLinear.scan_barcode),
+                            onPressed: _busy ? null : _scan,
+                          )
+                        : null,
                     helperText: insecure ? 'HTTP không mã hoá: chỉ dùng trong mạng nội bộ.' : null,
                   ),
                 ),

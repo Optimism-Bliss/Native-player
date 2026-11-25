@@ -28,6 +28,7 @@ import '../update/updater.dart';
 import '../util/links.dart';
 import '../util/log.dart';
 import 'connect_screen.dart';
+import 'qr_scan_screen.dart';
 import 'role_screen.dart';
 import 'web_window.dart';
 
@@ -107,6 +108,17 @@ class _BrowserScreenState extends State<BrowserScreen> {
     for (final l in AppLinks.take((l) => deviceLoginCode(l) != null)) {
       await _approveDevice(deviceLoginCode(l)!);
     }
+  }
+
+  Future<void> _scanQr() async {
+    final raw = await QrScanScreen.scan(context);
+    if (raw == null || !mounted) return;
+    final link = appLinkFromScan(raw);
+    if (link == null) {
+      _snack('Mã QR này không phải của TorBox STRM.');
+      return;
+    }
+    await _onLink(link);
   }
 
   /// A TV (or another device) shows a login QR: open this server's confirmation
@@ -771,6 +783,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
               ('signout', IconsaxPlusLinear.logout, 'Đăng xuất'),
               ('update', IconsaxPlusLinear.refresh_circle, 'Kiểm tra cập nhật'),
               ('log', IconsaxPlusLinear.document_text, 'Nhật ký'),
+              if (QrScanScreen.available && !isTvDevice)
+                ('scan', IconsaxPlusLinear.scan_barcode, 'Quét mã QR (ghép TV, đăng nhập TV, mã máy chủ)'),
               if (Platform.isAndroid) ('role', IconsaxPlusLinear.monitor_mobbile, 'Dùng máy này làm TV'),
               if (DecodePrefs.available)
                 (
@@ -807,6 +821,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
             (_) => false,
           );
         }
+      case 'scan':
+        await _scanQr();
       case 'decode':
         await DecodePrefs.set(!DecodePrefs.direct);
         if (mounted) {
