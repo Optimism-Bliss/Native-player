@@ -125,7 +125,7 @@ Từ bản rà soát mô tả bàn giao ban đầu:
 Thêm:
 
 5. Ký APK bằng khoá release (thêm secrets) và cân nhắc gói Linux (AppImage/Flatpak có sẵn WebKitGTK) cùng bộ cài Windows.
-6. Android TV: đã có MVP "Phát trên TV" (nhánh `dev`); còn lại: tìm TV tự động trong LAN (mDNS), duyệt web trên TV bằng D-pad.
+6. Android TV: đã có "Phát trên TV", tìm TV trong LAN (UDP 47801: điện thoại phát `TORBOXSTRM-DISCOVER-1`, TV trả tên + cổng; vẫn cần mã 6 số trên TV), D-pad trên trang web (chế độ TV của trang + phím đi thẳng xuống WebView). Còn cần thử trên TV box thật.
 7. Kiểm thử theo thiết bị (máy/GPU/màn hình): H.264 SDR, HEVC Main10/HDR10, MKV nhiều audio/phụ đề, AV1, HLG, Dolby Vision, ASS/PGS. Phân biệt "giải mã được" với "xuất đúng HDR".
 8. Nút ▶ trên web bị trùng: nút tròn ▶ và "▶ Phát" đều mở player trong app.
 9. **Desktop chỉ nên chạy một instance.** Mở app lần hai trên Linux thì WebView trắng ("named profile is in use by another process"); Windows có thể tương tự. Linux: bỏ `G_APPLICATION_NON_UNIQUE` và cho `activate` đưa cửa sổ cũ lên; Windows: mutex + chuyển tiếp sang cửa sổ đang chạy. Làm cùng phần deep link.

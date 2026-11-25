@@ -62,6 +62,7 @@ class TvReceiver {
       return;
     }
     server.listen(_handle, onError: (Object e) => appLog('tv server: $e'));
+    await _startDiscovery();
     _rotate = Timer.periodic(pairCodeLifetime, (_) => newCode());
     await refreshAddress();
     appLog('tv receiver on ${address.value}');
@@ -107,7 +108,29 @@ class TvReceiver {
     return Uri(scheme: 'http', host: host, port: port, path: '/pair', queryParameters: {'c': code.value});
   }
 
+  RawDatagramSocket? _udp;
+
+  /// Answers discovery broadcasts from phones on the LAN (name + port only).
+  Future<void> _startDiscovery() async {
+    try {
+      final udp = await RawDatagramSocket.bind(InternetAddress.anyIPv4, tvDiscoveryPort, reuseAddress: true);
+      _udp = udp;
+      udp.listen((event) {
+        if (event != RawSocketEvent.read) return;
+        final d = udp.receive();
+        if (d == null || !isLanHost(d.address.address) && d.address.address != '127.0.0.1') return;
+        if (utf8.decode(d.data, allowMalformed: true).trim() != discoverPing) return;
+        final reply = utf8.encode(jsonEncode({'app': 'torbox-strm', 'v': tvProtocol, 'name': name, 'port': port}));
+        udp.send(reply, d.address, d.port);
+      });
+    } catch (e) {
+      appLog('tv discovery unavailable: $e');
+    }
+  }
+
   Future<void> stop() async {
+    _udp?.close();
+    _udp = null;
     _rotate?.cancel();
     await _server?.close(force: true);
     _server = null;

@@ -139,6 +139,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
           children: [
             const Text('Mở app TorBox STRM trên TV (cùng mạng Wi-Fi), rồi nhập địa chỉ và mã hiện trên TV.'),
             const SizedBox(height: 12),
+            _TvFinder(onPick: (tv) => address.text = '${tv.host}:${tv.port}'),
             TextField(
               controller: address,
               keyboardType: TextInputType.url,
@@ -942,5 +943,59 @@ class SystemNavigatorPop {
     if (Platform.isAndroid) {
       await const MethodChannel('flutter/platform').invokeMethod<void>('SystemNavigator.pop');
     }
+  }
+}
+
+/// "Tìm TV trong mạng": lists TVs answering the LAN broadcast; tapping one
+/// fills in its address (the code on the TV is still needed).
+class _TvFinder extends StatefulWidget {
+  const _TvFinder({required this.onPick});
+  final ValueChanged<FoundTv> onPick;
+
+  @override
+  State<_TvFinder> createState() => _TvFinderState();
+}
+
+class _TvFinderState extends State<_TvFinder> {
+  bool _busy = false;
+  List<FoundTv>? _found;
+
+  Future<void> _scan() async {
+    setState(() => _busy = true);
+    final found = await discoverTvs();
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _found = found;
+    });
+    if (found.length == 1) widget.onPick(found.first);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final found = _found;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextButton.icon(
+          onPressed: _busy ? null : _scan,
+          icon: _busy
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(IconsaxPlusLinear.search_normal_1, size: 18),
+          label: const Text('Tìm TV trong mạng'),
+        ),
+        if (found != null && found.isEmpty)
+          const Text('Không thấy TV nào. TV phải đang mở app, cùng mạng Wi-Fi.', style: TextStyle(fontSize: 12)),
+        for (final tv in found ?? const <FoundTv>[])
+          ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(IconsaxPlusLinear.monitor, size: 20),
+            title: Text(tv.name),
+            subtitle: Text('${tv.host}:${tv.port}'),
+            onTap: () => widget.onPick(tv),
+          ),
+      ],
+    );
   }
 }

@@ -45,6 +45,20 @@ void main() {
     });
     tearDown(() => rx.stop());
 
+    test('a phone finds the TV with the LAN broadcast', () async {
+      if (rx.pairLink == null) {
+        markTestSkipped('no LAN address in this environment');
+        return;
+      }
+      final found = await discoverTvs();
+      if (found.isEmpty) {
+        markTestSkipped('broadcasts are not delivered in this environment');
+        return;
+      }
+      expect(found.first.name, 'Test TV');
+      expect(found.first.port, rx.port);
+    });
+
     test('pairing, auth, play validation, page relay and poll', () async {
       final link = rx.pairLink;
       if (link == null) {

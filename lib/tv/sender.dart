@@ -14,6 +14,47 @@ class TvError implements Exception {
   String toString() => message;
 }
 
+/// A TV that answered the LAN discovery broadcast.
+class FoundTv {
+  const FoundTv(this.host, this.port, this.name);
+  final String host;
+  final int port;
+  final String name;
+}
+
+/// Broadcasts on the LAN and collects the TVs that answer within [wait].
+Future<List<FoundTv>> discoverTvs({Duration wait = const Duration(milliseconds: 1500)}) async {
+  final found = <String, FoundTv>{};
+  RawDatagramSocket? udp;
+  try {
+    udp = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+    udp.broadcastEnabled = true;
+    final sock = udp;
+    sock.listen((event) {
+      if (event != RawSocketEvent.read) return;
+      final d = sock.receive();
+      if (d == null || !isLanHost(d.address.address)) return;
+      try {
+        final j = jsonDecode(utf8.decode(d.data));
+        if (j is Map && j['app'] == 'torbox-strm' && j['port'] is int) {
+          final name = j['name'] is String ? j['name'] as String : 'TV';
+          found[d.address.address] = FoundTv(d.address.address, j['port'] as int, name);
+        }
+      } catch (_) {}
+    });
+    final ping = utf8.encode(discoverPing);
+    for (var i = 0; i < 3; i++) {
+      sock.send(ping, InternetAddress('255.255.255.255'), tvDiscoveryPort);
+      await Future<void>.delayed(Duration(milliseconds: wait.inMilliseconds ~/ 3));
+    }
+  } catch (e) {
+    appLog('tv discovery failed: $e');
+  } finally {
+    udp?.close();
+  }
+  return found.values.toList();
+}
+
 /// Phone → TV requests (local network, see protocol.dart).
 class TvClient {
   TvClient(this.tv);

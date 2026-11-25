@@ -21,6 +21,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// So the phone's logged-in web page stays the only thing that talks to the
 /// server's API; the TV needs no login of its own.
 const tvPort = 47800;
+
+/// LAN discovery: the phone broadcasts [discoverPing] to this UDP port; TVs
+/// running the app answer with their name and HTTP port. Pairing still needs
+/// the code shown on the TV.
+const tvDiscoveryPort = 47801;
+const discoverPing = 'TORBOXSTRM-DISCOVER-1';
 const tvProtocol = 1;
 
 /// Pairing codes are short-lived and single use.
