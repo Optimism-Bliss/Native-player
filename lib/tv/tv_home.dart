@@ -147,7 +147,7 @@ class _TvHomeState extends State<TvHome> {
                         Text(
                           _server == null
                               ? 'TV chưa có máy chủ: kết nối điện thoại (đã vào máy chủ) là TV nhận luôn.'
-                              : 'Máy chủ: đã có (${ServerStore.label(_server!)}). Đăng nhập trên TV: "Duyệt phim trên TV" → "Đăng nhập bằng điện thoại".',
+                              : 'Máy chủ: đã có (${ServerStore.label(_server!)}). Đăng nhập: bấm "Duyệt phim trên TV", TV hiện QR, quét bằng điện thoại có app rồi bấm "Cho phép".',
                           style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                         ),
                         if (_rx.lastPhone.value != null) ...[

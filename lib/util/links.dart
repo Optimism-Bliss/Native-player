@@ -43,3 +43,13 @@ class AppLinks {
     return mine;
   }
 }
+
+/// Code in `torboxstrm://device?c=ABCD-EFGH`: the login QR a TV shows when
+/// its page runs in the app (the QR holds no server address; the phone uses
+/// its own).
+String? deviceLoginCode(String raw) {
+  final u = Uri.tryParse(raw.trim());
+  if (u == null || u.scheme != 'torboxstrm' || u.host != 'device') return null;
+  final c = (u.queryParameters['c'] ?? '').toUpperCase();
+  return RegExp(r'^[A-Z0-9]{4}-[A-Z0-9]{4}$').hasMatch(c) ? c : null;
+}

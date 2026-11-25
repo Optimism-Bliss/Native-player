@@ -96,19 +96,33 @@ class _BrowserScreenState extends State<BrowserScreen> {
   Future<void> _initTv() async {
     final tv = await PairedTv.load();
     if (mounted) setState(() => _tv = tv);
-    if (!Platform.isAndroid) return;
-    // pairing links (torboxstrm://pair?... from the TV's QR page) and server
-    // codes (torboxstrm://connect?c=... from the server's QR) while running
+    if (!Platform.isAndroid && !Platform.isIOS) return;
+    // pairing links (torboxstrm://pair?... from the TV's QR page), server
+    // codes (torboxstrm://connect?c=... from the server's QR) and TV logins
+    // (torboxstrm://device?c=... from a TV's login page) while running
     _links = AppLinks.stream.listen(_onLink);
     for (final l in AppLinks.take((l) => PairLink.parse(l) != null)) {
       await _pairFromLink(l);
     }
+    for (final l in AppLinks.take((l) => deviceLoginCode(l) != null)) {
+      await _approveDevice(deviceLoginCode(l)!);
+    }
+  }
+
+  /// A TV (or another device) shows a login QR: open this server's confirmation
+  /// page in the signed-in web view, so approving it is a single tap.
+  Future<void> _approveDevice(String code) async {
+    if (_external || !mounted) return;
+    appLog('device login: opening approval');
+    await _web.loadRequest(widget.server.replace(path: '/device', queryParameters: {'c': code}));
   }
 
   StreamSubscription<String>? _links;
 
   Future<void> _onLink(String raw) async {
     if (PairLink.parse(raw) != null) return _pairFromLink(raw);
+    final device = deviceLoginCode(raw);
+    if (device != null) return _approveDevice(device);
     final code = codeFromLink(raw);
     final server = code == null ? null : decodeServerCode(code);
     if (server == null || !mounted) return;
