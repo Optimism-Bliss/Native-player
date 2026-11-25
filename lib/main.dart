@@ -1,6 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:package_info_plus/package_info_plus.dart';
+
+import 'package:flutter/services.dart';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
@@ -58,6 +62,19 @@ Future<void> _start() async {
   if (Platform.isWindows) await prepareWindowsWebView();
   await detectTv();
   await DecodePrefs.load();
+  if (Platform.isAndroid) {
+    // which build runs where, how much RAM is free, and why the previous run ended
+    // (a TV box killed for memory leaves no error of its own in this log)
+    try {
+      final version = (await PackageInfo.fromPlatform()).version;
+      final info = await const MethodChannel('torboxstrm/intent').invokeMethod<String>('startInfo');
+      appLog(
+        'start info: app $version, ${isTvDevice ? 'TV' : 'phone'}${DecodePrefs.direct ? ', direct decode' : ''}; $info',
+      );
+    } catch (e) {
+      appLog('start info: $e');
+    }
+  }
   await AppLinks.init();
   var server = await ServerStore.load();
   // opened from a server code QR (torboxstrm://connect?c=...) before any server was set

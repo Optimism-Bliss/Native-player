@@ -55,6 +55,8 @@ class MainActivity : FlutterActivity() {
                     // Phone used as the TV's remote: the key goes through the window exactly like the
                     // real remote's (Flutter screens, the web page in the WebView, the player, dialogs).
                     "key" -> result.success(pressKey(call.argument<String>("key") ?: ""))
+                    // start-up log line: free RAM and why the previous run ended (killed for memory, crash…)
+                    "startInfo" -> result.success(startInfo())
                     "getBrightness" -> result.success(brightness())
                     "setBrightness" -> {
                         setBrightness(call.argument<Double>("value"))
@@ -94,6 +96,38 @@ class MainActivity : FlutterActivity() {
             dispatchKeyEvent(KeyEvent(t, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, code, 0))
         }
         return true
+    }
+
+    private fun startInfo(): String {
+        val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+        val mem = android.app.ActivityManager.MemoryInfo().also { am.getMemoryInfo(it) }
+        val mb = { b: Long -> b / (1024 * 1024) }
+        var text = "RAM ${mb(mem.availMem)}/${mb(mem.totalMem)} MB free${if (mem.lowMemory) " (low)" else ""}" +
+            ", app limit ${am.memoryClass}/${am.largeMemoryClass} MB"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val last = try {
+                am.getHistoricalProcessExitReasons(packageName, 0, 1).firstOrNull()
+            } catch (e: Exception) {
+                null
+            }
+            if (last != null) {
+                val reason = when (last.reason) {
+                    android.app.ApplicationExitInfo.REASON_LOW_MEMORY -> "killed: low memory"
+                    android.app.ApplicationExitInfo.REASON_CRASH -> "crash (Java)"
+                    android.app.ApplicationExitInfo.REASON_CRASH_NATIVE -> "crash (native)"
+                    android.app.ApplicationExitInfo.REASON_ANR -> "not responding (ANR)"
+                    android.app.ApplicationExitInfo.REASON_SIGNALED -> "killed by signal ${last.status}"
+                    android.app.ApplicationExitInfo.REASON_USER_REQUESTED -> "closed by the user"
+                    android.app.ApplicationExitInfo.REASON_EXIT_SELF -> "exited"
+                    android.app.ApplicationExitInfo.REASON_OTHER -> "killed by the system"
+                    else -> "reason ${last.reason}"
+                }
+                val ago = (System.currentTimeMillis() - last.timestamp) / 1000
+                text += "; previous run: $reason ${ago}s ago, used ${mb(last.pss * 1024)} MB" +
+                    (last.description?.let { " ($it)" } ?: "")
+            }
+        }
+        return text
     }
 
     private fun isTv(): Boolean {

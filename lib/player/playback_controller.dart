@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../bridge.dart';
+import '../util/tv_mode.dart';
 import 'decode_prefs.dart';
 import '../util/log.dart';
 import '../util/format.dart';
@@ -62,8 +63,10 @@ class PlayerHost {
       // Same network/cache tuning Fladder uses for direct HTTP playback.
       await native.setProperty('force-seekable', 'yes');
       await native.setProperty('cache', 'yes');
-      await native.setProperty('demuxer-max-bytes', '150M');
-      await native.setProperty('demuxer-max-back-bytes', '50M');
+      // TV boxes have little RAM (onn 4K: 2 GB, shared with the web page): a smaller cache
+      // still holds 30-60 s of 1080p and keeps Android from killing the app
+      await native.setProperty('demuxer-max-bytes', isTvDevice ? '64M' : '150M');
+      await native.setProperty('demuxer-max-back-bytes', isTvDevice ? '16M' : '50M');
       await native.setProperty('network-timeout', '60');
       await native.setProperty('stream-buffer-size', '4M');
       // When the cache runs dry, wait for a few seconds of data before playing on: one longer
