@@ -1,3 +1,11 @@
+**Có gì mới trong 2.0.5**
+- **Phát mượt hơn trên TV box** (học theo mpv-android): giải mã không chép từng khung hình (khung hình đi thẳng vào GPU, phụ đề ASS / PGS vẫn hiện) và vẽ hình nhẹ (bộ phóng hình đơn giản, bỏ khử viền màu / dithering) cho GPU yếu như Mi Box S. Nếu phim không lên hình: màn hình chính TV → "Tương thích: bật" rồi mở lại app.
+- **Khớp tần số màn hình** (tuỳ chọn, màn hình chính TV): màn hình chuyển theo phim (24 / 25 / 30 Hz) khi phát, hết giật đều; màn hình có thể tối khoảng 1 giây khi chuyển. Cần TV / màn hình nhận được các chế độ đó.
+- **Bỏ chế độ "giải mã trực tiếp"** (không lên hình trên một số box).
+- **Quét QR trong app** đọc được QR ghép TV ở màn hình chính TV.
+- **Menu app cuộn được**, phần TV (Remote, Xem nhật ký TV) lên đầu.
+- **Nhật ký** ghi thêm cảnh báo / lỗi của trình phát (libmpv) để chẩn đoán màn hình đen, giật.
+
 **Có gì mới trong 2.0.4**
 - **Windows:** bấm ▶ thì cửa sổ duyệt phim tự thu nhỏ xuống thanh tác vụ để trình phát hiện ra ngay (trước đây trình phát nằm phía sau, phải đóng cửa sổ web mới thấy); đóng trình phát thì cửa sổ web hiện lại.
 - **Windows:** thanh tiêu đề cửa sổ web không còn hiện địa chỉ máy chủ.
