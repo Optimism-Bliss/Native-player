@@ -1,3 +1,9 @@
+**Có gì mới trong 2.0.4**
+- **Windows:** bấm ▶ thì cửa sổ duyệt phim tự thu nhỏ xuống thanh tác vụ để trình phát hiện ra ngay (trước đây trình phát nằm phía sau, phải đóng cửa sổ web mới thấy); đóng trình phát thì cửa sổ web hiện lại.
+- **Windows:** thanh tiêu đề cửa sổ web không còn hiện địa chỉ máy chủ.
+- **Icon mới** (nút ▶ đỏ TorBox STRM) cho Windows và Android thay cho logo Flutter.
+- **Cập nhật:** nếu bản mới đang được tải lên GitHub, app báo thử lại sau 1–2 phút thay vì "HTTP 404". TV box 32-bit (như onn 4K) dùng file `armeabi-v7a`; app tự chọn đúng file khi cập nhật.
+
 **Có gì mới trong 2.0.3**
 - **Quét QR ngay trong app** (điện thoại): menu → "Quét mã QR", hoặc nút quét ở màn hình nhập máy chủ. Đọc QR ghép TV, QR đăng nhập TV và mã máy chủ; dùng khi camera của máy mở link `torboxstrm://` bằng trình duyệt. Lần đầu app xin quyền camera.
 - **Sửa link đăng nhập TV** (`torboxstrm://device`) không mở được app trên Android.
@@ -64,7 +70,7 @@ Native TorBox STRM app: browse the TorBox STRM web UI and play in a libmpv playe
 | Windows 10/11 x64 | `TorBox-STRM-windows-x64-setup.exe` (installer, no admin rights, Start menu shortcut) or `TorBox-STRM-windows-x64-portable.zip` (extract the whole folder, then run `TorBoxSTRM.exe`). Uses the system WebView2 runtime. |
 | Linux x64 / arm64 | `TorBox-STRM-linux-*.tar.gz` (needs `libwebkit2gtk-4.1-0` and `libmpv2`, see README-linux.txt) |
 | iPhone / iPad (iOS 15+) | `TorBox-STRM-ios.ipa`: unsigned, install with TrollStore, AltStore, SideStore or your own certificate. Pair a TV by scanning its QR code (iOS blocks LAN discovery). |
-| Android 7.0+ | `TorBox-STRM-android-arm64-v8a.apk` for most phones and TV boxes; `armeabi-v7a` for older 32-bit devices |
+| Android 7.0+ | `TorBox-STRM-android-arm64-v8a.apk` for most phones; `armeabi-v7a` for 32-bit Android (many TV boxes such as onn 4K, older phones). The app picks the right one when it updates itself |
 
 The Android APKs are signed with a @ANDROID_SIGNING@. Checksums are in `SHA256SUMS.txt`.
 
