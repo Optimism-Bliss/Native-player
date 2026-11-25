@@ -19,6 +19,7 @@ import '../settings.dart';
 import '../tv/protocol.dart';
 import '../tv/remote_screen.dart';
 import '../tv/sender.dart';
+import '../tv/tv_input.dart';
 import '../util/fullscreen.dart';
 import '../util/tv_mode.dart';
 import '../update/update_ui.dart';
@@ -26,6 +27,7 @@ import '../update/updater.dart';
 import '../util/links.dart';
 import '../util/log.dart';
 import 'connect_screen.dart';
+import 'role_screen.dart';
 import 'web_window.dart';
 
 /// The TorBox STRM web UI inside a WebView. The page itself handles login
@@ -277,15 +279,25 @@ class _BrowserScreenState extends State<BrowserScreen> {
     await _openRemote();
   }
 
+  /// Remote for the paired TV; also when nothing plays there (typing into
+  /// the TV's text fields).
   Future<void> _openRemote() async {
-    final session = _tvSession;
     final tv = _tv;
-    if (session == null || tv == null || !mounted) return;
+    if (tv == null || !mounted) return;
+    var session = _tvSession;
+    final own = session == null || !session.running;
+    if (own) {
+      session = TvSession(client: TvClient(tv), toPage: _sendEvent);
+      _tvSession = session;
+      unawaited(session.start());
+    }
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => TvRemoteScreen(session: session, tvName: tv.name),
+        builder: (_) => TvRemoteScreen(session: session!, tvName: tv.name),
       ),
     );
+    // opened only for the keyboard: stop polling when nothing plays on the TV
+    if (own && !session.state.value.active) session.stop();
   }
 
   Future<void> _start() async {
@@ -380,6 +392,12 @@ class _BrowserScreenState extends State<BrowserScreen> {
       );
       if (!fallback) appLog('bridge handler could not be registered');
     });
+    if (isTvDevice) {
+      // which text field has focus, so a paired phone can type into it (tv_input.dart)
+      await step('tv input', () async {
+        await _web.tryAddUserScript(const WebViewUserScript(source: _tvFieldScript));
+      });
+    }
     await step('script', () async {
       await _web.tryAddUserScript(
         WebViewUserScript(
@@ -395,6 +413,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
           onProgress: (p) => mounted ? setState(() => _progress = p) : null,
           onPageStarted: (url) {
             appLog('page started $url');
+            // the focused field belonged to the previous page
+            if (isTvDevice) TvInput.blur();
             if (mounted) setState(() => _loadError = null);
           },
           onPageFinished: (url) {
@@ -538,6 +558,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
   @override
   void dispose() {
+    if (isTvDevice) TvInput.blur();
     _links?.cancel();
     _lifecycle?.dispose();
     _window?.isOpen.removeListener(_onWindowOpenChanged);
@@ -560,6 +581,20 @@ class _BrowserScreenState extends State<BrowserScreen> {
       final tv = _tvSession;
       if (!_playerOpen && tv != null && tv.running && (type == 'subs' || type == 'subText' || type == 'subSearch')) {
         tv.client.page(raw!).catchError((Object e) => appLog('tv page relay: $e'));
+        return {'ok': true};
+      }
+      if (type == 'tvField' && isTvDevice) {
+        final f = raw is Map && raw['active'] == true ? TvField.fromJson(raw) : null;
+        if (f == null) {
+          TvInput.blur();
+        } else {
+          TvInput.focus(f, (action, text) async {
+            final r = await _web.runJavaScriptReturningResult(
+              'window.__tbsInput?window.__tbsInput(${jsonEncode(action)},${jsonEncode(text)}):false',
+            );
+            return r == true || r.toString() == 'true' || r.toString() == '1';
+          });
+        }
         return {'ok': true};
       }
       if (type == 'menu') {
@@ -697,13 +732,14 @@ class _BrowserScreenState extends State<BrowserScreen> {
               subtitle: Text(_version.isEmpty ? 'TorBox STRM' : 'TorBox STRM $_version'),
             ),
             const Divider(height: 1),
-            for (final (value, icon, label) in const [
+            for (final (value, icon, label) in [
               ('reload', IconsaxPlusLinear.refresh, 'Tải lại trang'),
               ('home', IconsaxPlusLinear.home_2, 'Về trang chủ'),
               ('server', IconsaxPlusLinear.global_edit, 'Đổi máy chủ'),
               ('signout', IconsaxPlusLinear.logout, 'Đăng xuất'),
               ('update', IconsaxPlusLinear.refresh_circle, 'Kiểm tra cập nhật'),
               ('log', IconsaxPlusLinear.document_text, 'Nhật ký'),
+              if (Platform.isAndroid) ('role', IconsaxPlusLinear.monitor_mobbile, 'Dùng máy này làm TV'),
               ('quit', IconsaxPlusLinear.close_circle, 'Thoát app'),
             ])
               ListTile(leading: Icon(icon), title: Text(label), onTap: () => Navigator.pop(context, value)),
@@ -725,6 +761,14 @@ class _BrowserScreenState extends State<BrowserScreen> {
         if (mounted) await checkForUpdate(context);
       case 'log':
         await _showLog();
+      case 'role':
+        await saveRole(tv: true);
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute<void>(builder: (_) => RoleScreen.homeFor(widget.server)),
+            (_) => false,
+          );
+        }
       case 'quit':
         await SystemNavigatorPop.pop();
       default:
@@ -734,10 +778,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
   List<Widget> _tvMenuTiles(BuildContext context) => [
     const Divider(height: 1),
-    if (_tvSession?.running == true)
+    if (_tv != null)
       ListTile(
         leading: const Icon(IconsaxPlusLinear.monitor_recorder),
-        title: Text('Điều khiển ${_tv?.name ?? 'TV'}'),
+        title: Text('Điều khiển / gõ chữ trên ${_tv?.name ?? 'TV'}'),
         onTap: () => Navigator.pop(context, 'tv-remote'),
       ),
     ListTile(
@@ -943,7 +987,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
                   subtitle: _version.isEmpty ? null : Text('Bản $_version'),
                 ),
               ),
-              if (_tvSession?.running == true)
+              if (_tv != null)
                 const PopupMenuItem(
                   value: 'tv-remote',
                   child: ListTile(leading: Icon(IconsaxPlusLinear.monitor_recorder), title: Text('Điều khiển TV')),
@@ -1043,3 +1087,37 @@ class _TvFinderState extends State<_TvFinder> {
     );
   }
 }
+
+/// TV only: reports the focused text field to the app (bridge message
+/// `tvField`) and lets the app type into it (`window.__tbsInput`). Values are
+/// set through the native setter and announced with input/change events, so
+/// the page sees them like typing.
+const _tvFieldScript = r'''
+(() => {
+  if (window.__tbsInput) return;
+  const typed = (el) => el && ((el.tagName === 'INPUT' && !['checkbox','radio','button','submit','reset','range','color','file','hidden','image'].includes(el.type)) || el.tagName === 'TEXTAREA' || el.isContentEditable);
+  const send = (msg) => { try { window.webviewAll && window.webviewAll.callHandler('torboxStrm', msg); } catch (_) {} };
+  const label = (el) => ((el.labels && el.labels[0] && el.labels[0].innerText) || el.getAttribute('aria-label') || el.placeholder || el.name || '').trim().slice(0, 80);
+  const report = (el) => typed(el)
+    ? send({type: 'tvField', active: true, kind: el.type || 'text', label: label(el), value: el.type === 'password' ? '' : String(el.value || '').slice(0, 500)})
+    : send({type: 'tvField', active: false});
+  document.addEventListener('focusin', (e) => report(e.target), true);
+  document.addEventListener('focusout', () => setTimeout(() => report(document.activeElement), 80), true);
+  window.__tbsInput = (action, text) => {
+    const el = document.activeElement;
+    if (!typed(el)) return false;
+    if (action === 'set') {
+      const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      const setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+      setter.call(el, text);
+      el.dispatchEvent(new Event('input', {bubbles: true}));
+      el.dispatchEvent(new Event('change', {bubbles: true}));
+    } else if (action === 'enter') {
+      const ev = new KeyboardEvent('keydown', {key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true});
+      const handled = !el.dispatchEvent(ev);
+      if (!handled && el.form) { el.form.requestSubmit ? el.form.requestSubmit() : el.form.submit(); }
+    }
+    return true;
+  };
+})();
+''';

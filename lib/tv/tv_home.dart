@@ -9,7 +9,9 @@ import '../player/playback_controller.dart';
 import '../player/player_screen.dart';
 import '../screens/browser_screen.dart';
 import '../screens/connect_screen.dart';
+import '../screens/role_screen.dart';
 import '../settings.dart';
+import '../util/tv_mode.dart';
 import '../util/log.dart';
 import 'receiver.dart';
 
@@ -163,6 +165,18 @@ class _TvHomeState extends State<TvHome> {
                               onPressed: _browse,
                               icon: const Icon(IconsaxPlusLinear.global),
                               label: const Text('Duyệt phim trên TV'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                await saveRole(tv: false);
+                                if (!context.mounted) return;
+                                Navigator.of(context).pushAndRemoveUntil(
+                                  MaterialPageRoute<void>(builder: (_) => RoleScreen.homeFor(_server)),
+                                  (_) => false,
+                                );
+                              },
+                              icon: const Icon(IconsaxPlusLinear.mobile),
+                              label: const Text('Dùng như điện thoại'),
                             ),
                             OutlinedButton.icon(
                               onPressed: _rx.newCode,

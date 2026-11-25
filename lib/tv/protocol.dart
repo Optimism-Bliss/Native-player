@@ -3,6 +3,8 @@ import 'dart:math';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'tv_input.dart';
+
 /// "Play on TV" over the local network, phone → TV, no cloud relay.
 ///
 /// The TV runs a small HTTP server ([TvReceiver]) and shows a QR code that
@@ -149,7 +151,11 @@ class TvState {
     this.serverSubtitleId,
     this.volume = 100,
     this.error,
+    this.input,
   });
+
+  /// The text field focused on the TV, if any (phone shows a keyboard for it).
+  final TvField? input;
 
   final bool active;
   final String title;
@@ -187,6 +193,7 @@ class TvState {
     'serverSid': serverSubtitleId,
     'volume': volume,
     'error': error,
+    'input': input?.toJson(),
   };
 
   static TvState fromJson(Object? j) {
@@ -211,6 +218,7 @@ class TvState {
       serverSubtitleId: j['serverSid'] is String ? j['serverSid'] as String : null,
       volume: j['volume'] is num ? (j['volume'] as num).toDouble() : 100,
       error: j['error'] is String ? j['error'] as String : null,
+      input: TvField.fromJson(j['input']),
     );
   }
 }

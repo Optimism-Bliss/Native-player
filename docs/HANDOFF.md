@@ -124,6 +124,11 @@ Có hình sau 2,7 s (tập đang xem dở, đã xin sẵn link) / 6,0 s / 9,8 s 
 - **Máy chủ cho TV:** khi điện thoại ghép đôi với TV (QR trên TV hoặc nhập mã), điện thoại gửi mã máy chủ (`POST /server` trên TV). TV lưu như khi kết nối bằng mã, nên cũng không hiện địa chỉ.
 - **Đăng nhập trên TV** (server, nhánh `feat/device-login`): trang /login có nút "📱 Đăng nhập bằng điện thoại", hiện QR + mã 8 ký tự (`POST /login/device/start`). Điện thoại mở `/device?c=MÃ` (đăng nhập nếu chưa) và bấm "Cho phép". TV hỏi `/login/device/poll`; câu trả lời "approved" đặt cookie phiên 30 ngày. Mã sống 10 phút, dùng một lần, giới hạn 20 yêu cầu / 10 phút / IP. Đã thử trọn luồng bằng curl và trong app Linux: bấm Cho phép, app tự vào trang chủ.
 
+## Gõ chữ cho TV từ điện thoại, chọn vai trò thiết bị
+
+- **Gõ trên TV** (`lib/tv/tv_input.dart`): trên TV, trang web có script báo ô đang được chọn (bridge `tvField`). Màn hình nhập địa chỉ máy chủ cũng báo. TV đưa ô đó vào trạng thái gửi cho điện thoại (`input`) và nhận `POST /input {action: set|enter, text}`. Script đặt giá trị bằng setter gốc rồi phát sự kiện `input`/`change`; Enter phát `keydown` rồi `requestSubmit` form. Màn hình điều khiển trên điện thoại hiện khung "⌨ Gõ trên TV" khi TV có ô đang chọn: gửi cả chuỗi sau 250 ms, ô mật khẩu thì che chữ. Menu "Điều khiển / gõ chữ trên TV" mở được cả khi TV không phát gì. Đã thử trên Linux ở chế độ TV: điện thoại gõ mã máy chủ, TV kết nối; gõ tài khoản, Enter tự sang ô mật khẩu, gõ mật khẩu, Enter là đăng nhập.
+- **Vai trò thiết bị** (`lib/screens/role_screen.dart`, `util/tv_mode.dart`): lần đầu mở trên Android, app hỏi "Điện thoại / máy tính" hay "TV" (focus sẵn theo gợi ý của Android: UI mode TV / leanback). Lựa chọn lưu ở `device_role`. Đổi lại: điện thoại menu → "Dùng máy này làm TV"; TV → "Dùng như điện thoại". Trên desktop, `TORBOXSTRM_ASK_ROLE=1` để thử màn này.
+
 ## Làm sau
 
 Từ bản rà soát mô tả bàn giao ban đầu:

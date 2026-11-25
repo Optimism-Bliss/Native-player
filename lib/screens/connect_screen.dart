@@ -5,6 +5,8 @@ import 'package:material_ui/material_ui.dart';
 
 import '../connect_code.dart';
 import '../settings.dart';
+import '../tv/tv_input.dart';
+import '../util/tv_mode.dart';
 import '../util/links.dart';
 import 'browser_screen.dart';
 
@@ -27,9 +29,30 @@ class _ConnectScreenState extends State<ConnectScreen> {
   );
   StreamSubscription<String>? _links;
 
+  final FocusNode _field = FocusNode();
+
+  /// TV: a paired phone can type the address or code.
+  void _onFieldFocus() {
+    if (!isTvDevice) return;
+    if (_field.hasFocus) {
+      TvInput.focus(TvField(label: 'Địa chỉ hoặc mã máy chủ', kind: 'url', value: _url.text), (action, text) async {
+        if (!mounted) return false;
+        if (action == 'enter') {
+          await _connect();
+        } else {
+          setState(() => _url.text = text);
+        }
+        return true;
+      });
+    } else {
+      TvInput.blur();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _field.addListener(_onFieldFocus);
     // opened from the server's QR code (camera -> torboxstrm://connect?c=...)
     _links = AppLinks.stream.listen(_fromLink);
     for (final l in AppLinks.take((l) => codeFromLink(l) != null)) {
@@ -49,6 +72,9 @@ class _ConnectScreenState extends State<ConnectScreen> {
 
   @override
   void dispose() {
+    _field.removeListener(_onFieldFocus);
+    if (_field.hasFocus) TvInput.blur();
+    _field.dispose();
     _links?.cancel();
     _url.dispose();
     super.dispose();
@@ -120,6 +146,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                 const SizedBox(height: 24),
                 TextField(
                   controller: _url,
+                  focusNode: _field,
                   autofocus: true,
                   enabled: !_busy,
                   keyboardType: TextInputType.url,

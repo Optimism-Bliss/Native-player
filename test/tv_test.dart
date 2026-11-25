@@ -61,8 +61,8 @@ void main() {
         markTestSkipped('broadcasts are not delivered in this environment');
         return;
       }
-      expect(found.first.name, 'Test TV');
-      expect(found.first.port, rx.port);
+      // other TVs on the network may answer too
+      expect(found.any((t) => t.name == 'Test TV' && t.port == rx.port), isTrue, reason: '$found');
     });
 
     test('pairing, auth, play validation, page relay and poll', () async {

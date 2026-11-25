@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../util/format.dart';
 import 'protocol.dart';
 import 'sender.dart';
+import 'tv_input.dart';
 
 /// Phone remote for what plays on the TV, kept in sync by the session's poll.
 class TvRemoteScreen extends StatefulWidget {
@@ -127,12 +130,22 @@ class _TvRemoteScreenState extends State<TvRemoteScreen> {
                           child: Padding(padding: const EdgeInsets.all(12), child: Text(p)),
                         ),
                 ),
-                if (!st.active && !s.running)
+                if (!st.active && !s.running && st.input == null)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Text('TV không phát gì.', style: text.titleMedium, textAlign: TextAlign.center),
                   ),
-                Text(st.title.isEmpty ? 'Đang mở trên TV…' : st.title, style: text.titleLarge, maxLines: 3),
+                if (st.input != null) _TvKeyboard(session: s, field: st.input!),
+                if (!st.active && st.input == null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Text(
+                      'Chọn một ô nhập trên TV (tìm phim, đăng nhập…) là có thể gõ từ đây.',
+                      style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
+                  ),
+                if (st.active)
+                  Text(st.title.isEmpty ? 'Đang mở trên TV…' : st.title, style: text.titleLarge, maxLines: 3),
                 if (st.count > 1) Text('${st.index + 1} / ${st.count}', style: text.bodySmall),
                 if (st.error != null) Text(st.error!, style: text.bodyMedium?.copyWith(color: scheme.error)),
                 const SizedBox(height: 16),
@@ -237,6 +250,109 @@ class _TvRemoteScreenState extends State<TvRemoteScreen> {
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+/// Types into the text field focused on the TV. Sends the whole text a moment
+/// after each change (so corrections and pasted text work the same), and
+/// "Gửi" submits like Enter.
+class _TvKeyboard extends StatefulWidget {
+  const _TvKeyboard({required this.session, required this.field});
+  final TvSession session;
+  final TvField field;
+
+  @override
+  State<_TvKeyboard> createState() => _TvKeyboardState();
+}
+
+class _TvKeyboardState extends State<_TvKeyboard> {
+  late final TextEditingController _text = TextEditingController(text: widget.field.value);
+  Timer? _debounce;
+  String? _error;
+
+  @override
+  void didUpdateWidget(_TvKeyboard old) {
+    super.didUpdateWidget(old);
+    // another field got focus on the TV: start from its text
+    if (old.field.label != widget.field.label || old.field.kind != widget.field.kind) {
+      _text.text = widget.field.value;
+    }
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _text.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send(String action) async {
+    _debounce?.cancel();
+    try {
+      if (action == 'enter') await widget.session.client.input('set', _text.text);
+      await widget.session.client.input(action, _text.text);
+      if (mounted && _error != null) setState(() => _error = null);
+    } on TvError catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final f = widget.field;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(IconsaxPlusLinear.keyboard, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Gõ trên TV${f.label.isEmpty ? '' : ' · ${f.label}'}',
+                    style: Theme.of(context).textTheme.titleSmall,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _text,
+              autofocus: true,
+              obscureText: f.password,
+              autocorrect: false,
+              keyboardType: switch (f.kind) {
+                'email' => TextInputType.emailAddress,
+                'url' => TextInputType.url,
+                'number' => TextInputType.number,
+                _ => TextInputType.text,
+              },
+              textInputAction: TextInputAction.send,
+              onChanged: (_) {
+                _debounce?.cancel();
+                _debounce = Timer(const Duration(milliseconds: 250), () => _send('set'));
+              },
+              onSubmitted: (_) => _send('enter'),
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                isDense: true,
+                errorText: _error,
+                suffixIcon: IconButton(
+                  tooltip: 'Gửi (Enter)',
+                  icon: const Icon(IconsaxPlusLinear.send_1),
+                  onPressed: () => _send('enter'),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

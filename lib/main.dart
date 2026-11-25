@@ -8,13 +8,11 @@ import 'package:window_manager/window_manager.dart';
 
 import 'package:webview_all_windows/webview_all_windows.dart';
 
-import 'screens/browser_screen.dart';
-import 'screens/connect_screen.dart';
+import 'screens/role_screen.dart';
 import 'connect_code.dart';
 import 'settings.dart';
 import 'theme.dart';
 import 'util/fullscreen.dart';
-import 'tv/tv_home.dart';
 import 'util/links.dart';
 import 'util/log.dart';
 import 'util/tv_mode.dart';
@@ -79,11 +77,7 @@ class TorboxStrmApp extends StatelessWidget {
       title: 'TorBox STRM',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
-      home: isTvDevice
-          ? TvHome(server: server)
-          : server == null
-          ? const ConnectScreen()
-          : BrowserScreen(server: server!),
+      home: roleUnset ? RoleScreen(server: server) : RoleScreen.homeFor(server),
     );
   }
 }

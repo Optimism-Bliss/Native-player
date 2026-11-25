@@ -134,6 +134,12 @@ class TvClient {
 
   Future<void> page(Object raw) => _call('POST', '/page', body: {'msg': raw});
 
+  /// Types into the field focused on the TV: `set` replaces its text, `enter` submits.
+  Future<void> input(String action, String text) async {
+    final data = await _call('POST', '/input', body: {'action': action, 'text': text});
+    if (data is Map && data['ok'] != true) throw TvError((data['error'] as String?) ?? 'TV không nhận chữ');
+  }
+
   /// Gives the TV this phone's server (as a server code) so it can browse and log in.
   Future<void> setServer(String code) => _call('POST', '/server', body: {'code': code});
 

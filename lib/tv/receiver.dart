@@ -12,6 +12,7 @@ import '../player/player_screen.dart';
 import '../player/widgets/track_sheets.dart';
 import '../util/log.dart';
 import 'protocol.dart';
+import 'tv_input.dart';
 
 /// Opens the player on the TV for a request from a paired phone.
 typedef OpenPlayer = Future<void> Function(PlayRequest request);
@@ -163,7 +164,7 @@ class TvReceiver {
 
   TvState state() {
     final c = remote.controller;
-    if (c == null || !c.initialized) return TvState(active: _active);
+    if (c == null || !c.initialized) return TvState(active: _active, input: TvInput.field.value);
     final p = c.player.state;
     final embedded = [
       for (final t in p.tracks.subtitle)
@@ -189,6 +190,7 @@ class TvReceiver {
       serverSubtitleId: c.serverSubtitleId.value,
       volume: p.volume,
       error: c.error.value,
+      input: TvInput.field.value,
     );
   }
 
@@ -216,6 +218,16 @@ class TvReceiver {
       switch ((req.method, path)) {
         case ('POST', '/play'):
           return await _play(req);
+        case ('POST', '/input'):
+          final body = await _body(req);
+          final action = body['action'] is String ? body['action'] as String : 'set';
+          final text = body['text'] is String ? body['text'] as String : '';
+          final sink = TvInput.sink;
+          if (sink == null || text.length > 2000 || !const {'set', 'enter'}.contains(action)) {
+            return await _json(res, {'ok': false, 'error': 'Trên TV chưa chọn ô nhập nào'});
+          }
+          final ok = await sink(action, text);
+          return await _json(res, {'ok': ok, 'error': ok ? null : 'Ô nhập trên TV không còn được chọn'});
         case ('POST', '/server'):
           final body = await _body(req);
           final code = body['code'];
