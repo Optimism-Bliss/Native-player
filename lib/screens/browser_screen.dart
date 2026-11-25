@@ -29,6 +29,7 @@ import '../util/links.dart';
 import '../util/log.dart';
 import 'connect_screen.dart';
 import 'qr_scan_screen.dart';
+import '../util/win_windows.dart';
 import 'role_screen.dart';
 import 'web_window.dart';
 
@@ -661,6 +662,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
   /// let a hidden window simply take the foreground, so it stays above the web
   /// window (always on top) while the player is open, in full screen.
   Future<void> _raisePlayerWindow() async {
+    // the web window steps aside (minimized) so nothing can cover the player
+    WebWindowNative.minimize();
     try {
       await windowManager.show();
       await windowManager.setAlwaysOnTop(true);
@@ -700,7 +703,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
       try {
         await windowManager.setAlwaysOnTop(false);
         // back to the web window (PlayerScreen already left fullscreen)
-        if (_window!.isOpen.value) await windowManager.hide();
+        if (_window!.isOpen.value) {
+          WebWindowNative.restore();
+          await windowManager.hide();
+        }
       } catch (_) {}
     }
   }

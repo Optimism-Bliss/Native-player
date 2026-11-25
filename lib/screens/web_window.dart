@@ -8,7 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_all/webview_all.dart' show WebViewJavaScriptCall, WebViewJavaScriptWorld;
 
 import '../bridge.dart';
-import '../settings.dart';
 import '../util/log.dart';
 import '../util/tv_mode.dart';
 
@@ -99,8 +98,8 @@ class WebWindow {
         windowWidth: 1280,
         windowHeight: 800,
         title: 'TorBox STRM',
-        // added with a server code: keep the address out of the title bar
-        titleBar: TitleBarOptions(showHost: !ServerStore.hidden),
+        // never the server address in the title bar (screenshots, screen sharing)
+        titleBar: const TitleBarOptions(showHost: false),
         openMaximized: true,
         brightness: Brightness.dark,
         windows: WindowsWebviewOptions(userDataFolder: _profile, denyCameraAndMicrophone: true),
