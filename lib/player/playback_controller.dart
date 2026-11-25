@@ -7,6 +7,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import '../bridge.dart';
 import '../util/tv_mode.dart';
+import 'subtitle_style.dart';
 import 'tv_playback_prefs.dart';
 import '../util/log.dart';
 import '../util/format.dart';
@@ -208,12 +209,14 @@ class PlaybackController {
     if (native is NativePlayer) {
       // Per-file subtitle delay must not leak into the next session.
       await native.setProperty('sub-delay', '0');
+      await native.setProperty('sub-visibility', 'yes');
     }
     // The shared player keeps its speed; every session starts at 1×.
     await player.setRate(1.0);
     if (native is NativePlayer) {}
     // Controls are visible when the player opens.
     await raiseSubtitles(true);
+    await SubtitleStyle.current.apply(player);
 
     _subs
       ..add(player.stream.position.listen((p) => _lastPosition = p))
@@ -224,6 +227,7 @@ class PlaybackController {
             _loadedLogged = true;
             appLog('play: file opened after $_t');
             if (!_fileLoaded.isCompleted) _fileLoaded.complete(true);
+            unawaited(_readChapters());
           }
         }),
       )
@@ -268,6 +272,7 @@ class PlaybackController {
     }
     serverSubtitles.value = const [];
     serverSubtitleId.value = null;
+    chapterCount.value = 0;
     if (search.value.key != item.key) search.value = const SubtitleSearchState();
     _serverTitle = null;
     _serverTitles.clear();
@@ -620,6 +625,44 @@ class PlaybackController {
     await native.setProperty('sub-pos', '$pos');
   }
 
+  /// Chapters of the current file (MKV / MP4 chapter list); 0 or 1 hides the chapter buttons.
+  final ValueNotifier<int> chapterCount = ValueNotifier(0);
+
+  Future<void> _readChapters() async {
+    final n = int.tryParse(await _prop('chapters')) ?? 0;
+    if (!_disposed) chapterCount.value = n;
+  }
+
+  Future<void> _mpv(List<String> cmd) async {
+    final native = player.platform;
+    if (native is NativePlayer && !_disposed) await native.command(cmd);
+  }
+
+  /// Previous / next chapter, with its name in the notice.
+  Future<void> chapterStep(int delta) async {
+    if (chapterCount.value < 2) return;
+    final before = int.tryParse(await _prop('chapter')) ?? 0;
+    // "back" within the first seconds of a chapter goes to the previous one, like most players
+    await _mpv(['add', 'chapter', '$delta']);
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    final now = int.tryParse(await _prop('chapter')) ?? before;
+    final title = await _prop('chapter-metadata/title');
+    _say('Chương ${now + 1}/${chapterCount.value}${title.isNotEmpty ? ': $title' : ''}');
+  }
+
+  /// Subtitle timing, ±100 ms per press.
+  Future<void> subtitleDelay(double seconds) async {
+    await _mpv(['add', 'sub-delay', seconds.toStringAsFixed(2)]);
+    final d = double.tryParse(await _prop('sub-delay')) ?? 0;
+    _say('Lệch phụ đề: ${d >= 0 ? '+' : ''}${(d * 1000).round()} ms');
+  }
+
+  Future<void> toggleSubtitles() async {
+    await _mpv(['cycle', 'sub-visibility']);
+    final on = await _prop('sub-visibility');
+    _say(on == 'no' ? 'Đã ẩn phụ đề' : 'Đã hiện phụ đề');
+  }
+
   Future<void> seekRelative(Duration delta) async {
     final duration = player.state.duration;
     var target = player.state.position + delta;
@@ -686,6 +729,7 @@ class PlaybackController {
     localSubtitles.dispose();
     search.dispose();
     serverSubtitleId.dispose();
+    chapterCount.dispose();
     notice.dispose();
   }
 }

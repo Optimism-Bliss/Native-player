@@ -15,8 +15,10 @@ import '../util/fullscreen.dart';
 import '../util/log.dart';
 import '../util/tv_mode.dart';
 import 'native_tv_player.dart';
+import 'pip.dart';
 import 'playback_controller.dart';
 import 'widgets/progress_bar.dart';
+import 'widgets/subtitle_style_sheet.dart';
 import 'widgets/track_sheets.dart';
 
 /// Full-screen player. Layout and interactions follow Fladder's DesktopControls:
@@ -106,7 +108,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
       if (!mounted) return;
       _playingSub = c.player.stream.playing.listen((playing) {
         if (playing && _overlay) _restartHideTimer();
+        // phones: Home while playing shrinks the film into a small window
+        final w = c.player.state.width ?? 16, h = c.player.state.height ?? 9;
+        Pip.arm(playing, width: w, height: h);
       });
+      Pip.onDismissed = () {
+        if (mounted) c.player.pause();
+      };
+      Pip.active.addListener(_onPip);
     }, onError: (_) {});
   }
 
@@ -121,6 +130,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
     _playFocus.dispose();
     _playingSub?.cancel();
+    Pip.active.removeListener(_onPip);
+    Pip.onDismissed = null;
+    Pip.arm(false);
     _hideTimer?.cancel();
     _seekFlashTimer?.cancel();
     _focus.dispose();
@@ -424,6 +436,24 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
   }
 
+  static final _digits = [
+    LogicalKeyboardKey.digit0,
+    LogicalKeyboardKey.digit1,
+    LogicalKeyboardKey.digit2,
+    LogicalKeyboardKey.digit3,
+    LogicalKeyboardKey.digit4,
+    LogicalKeyboardKey.digit5,
+    LogicalKeyboardKey.digit6,
+    LogicalKeyboardKey.digit7,
+    LogicalKeyboardKey.digit8,
+    LogicalKeyboardKey.digit9,
+  ];
+
+  int? _digit(LogicalKeyboardKey key) {
+    final i = _digits.indexOf(key);
+    return i < 0 ? null : i;
+  }
+
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
@@ -456,6 +486,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
       if (!repeat) act(_toggleMute);
     } else if (key == LogicalKeyboardKey.keyF || key == LogicalKeyboardKey.f11) {
       if (!repeat) _toggleFullscreen();
+    } else if (key == LogicalKeyboardKey.keyZ) {
+      act(() => c.subtitleDelay(-0.1));
+    } else if (key == LogicalKeyboardKey.keyX) {
+      act(() => c.subtitleDelay(0.1));
+    } else if (key == LogicalKeyboardKey.keyS || key == LogicalKeyboardKey.keyV) {
+      if (!repeat) act(c.toggleSubtitles);
+    } else if (key == LogicalKeyboardKey.pageUp) {
+      if (!repeat) act(() => c.chapterStep(-1));
+    } else if (key == LogicalKeyboardKey.pageDown) {
+      if (!repeat) act(() => c.chapterStep(1));
+    } else if (_digit(key) != null && !repeat) {
+      // 0-9: jump to 0 %, 10 % … 90 % of the film
+      final d = c.player.state.duration;
+      if (d > Duration.zero) act(() => c.player.seek(d * (_digit(key)! / 10)));
     } else if (key == LogicalKeyboardKey.keyN && !repeat) {
       if (c.hasNext) act(c.next);
     } else if (key == LogicalKeyboardKey.keyP && !repeat) {
@@ -540,6 +584,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return KeyEventResult.handled;
   }
 
+  /// Small window: only the picture (and subtitles), no controls.
+  void _onPip() {
+    if (!mounted) return;
+    if (Pip.active.value) {
+      _hideTimer?.cancel();
+      setState(() => _overlay = false);
+    } else {
+      setState(() {});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -612,16 +667,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
             )
           else
             const ColoredBox(color: Colors.black),
-          _gestureLayer(),
-          _centerStatus(),
-          IgnorePointer(
-            ignoring: !_overlay,
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 350),
-              opacity: _overlay ? 1 : 0,
-              child: Column(children: [_topBar(context), const Spacer(), _bottomPanel(context)]),
+          if (!Pip.active.value) ...[_gestureLayer(), _centerStatus()],
+          if (!Pip.active.value)
+            IgnorePointer(
+              ignoring: !_overlay,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 350),
+                opacity: _overlay ? 1 : 0,
+                child: Column(children: [_topBar(context), const Spacer(), _bottomPanel(context)]),
+              ),
             ),
-          ),
           _seekIndicator(),
           if (_touch) _levelIndicator(),
           ValueListenableBuilder<String?>(
@@ -844,6 +899,32 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       tooltip: 'Thông tin phát',
                       onPressed: () => showPlaybackInfo(context, c.player, c.active.value),
                       icon: const Icon(IconsaxPlusLinear.more),
+                    ),
+                    if (wide)
+                      IconButton(
+                        tooltip: 'Kiểu chữ phụ đề',
+                        onPressed: () => showSubtitleStyleSheet(context, c.player),
+                        icon: const Icon(IconsaxPlusLinear.text),
+                      ),
+                    ValueListenableBuilder<int>(
+                      valueListenable: c.chapterCount,
+                      builder: (context, n, _) => n < 2 || !wide
+                          ? const SizedBox.shrink()
+                          : Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  tooltip: 'Chương trước (PgUp)',
+                                  onPressed: () => c.chapterStep(-1),
+                                  icon: const Icon(IconsaxPlusLinear.backward),
+                                ),
+                                IconButton(
+                                  tooltip: 'Chương sau (PgDn)',
+                                  onPressed: () => c.chapterStep(1),
+                                  icon: const Icon(IconsaxPlusLinear.forward),
+                                ),
+                              ],
+                            ),
                     ),
                     if (wide) ...[
                       Flexible(child: _trackChip(audio: false)),
