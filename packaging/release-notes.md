@@ -1,3 +1,7 @@
+**Có gì mới trong 2.0.0** (cần server `2.0.0`)
+- **iPhone / iPad (thử nghiệm):** file `TorBox-STRM-ios.ipa` chưa ký. Tự cài bằng TrollStore (vĩnh viễn), AltStore / SideStore (Apple ID thường, ký lại 7 ngày một lần) hoặc eSign / chứng chỉ riêng. Ghép TV bằng quét QR (iOS không cho tự dò TV trong mạng); nhật ký nằm trong ứng dụng Tệp → Trên iPhone → TorBox STRM. Cập nhật: tải IPA mới rồi cài đè bằng cùng công cụ.
+- **Server 2.0.0:** tab Anime và HHTQ, khám phá JAV theo diễn viên (hot trong tháng, mọi phim mới nhất trước, lọc hãng / thể loại, ＋ thêm nhanh bản TorBox có sẵn). Các tính năng này có ngay trong app khi server cập nhật.
+
 **Có gì mới trong 1.1.5** (cần server `1.7.0-dev.12`)
 - **Chọn vai trò khi mở lần đầu:** "Điện thoại / máy tính" hay "TV" (Android). Đổi lại: menu điện thoại → "Dùng máy này làm TV"; trên TV → "Dùng như điện thoại".
 - **Gõ chữ cho TV từ điện thoại:** chọn ô nhập trên TV (tìm phim, tài khoản, mật khẩu, mã máy chủ), rồi trên điện thoại mở menu → "Điều khiển / gõ chữ trên TV".
@@ -27,7 +31,7 @@
 
 Native TorBox STRM app: browse the TorBox STRM web UI and play in a libmpv player (Fladder-style controls).
 
-**Server:** needs TorBox STRM `1.7.0-dev.12` or later for everything above (`1.7.0-dev.5`+ for the in-app player).
+**Server:** needs TorBox STRM `2.0.0` or later (`1.7.0-dev.12` for the app features before 2.0.0) for everything above (`1.7.0-dev.5`+ for the in-app player).
 
 **Updates:** the app checks this page for new releases and installs them (Android asks for permission to install apps once). Builds from 0.4.3 on are signed with a fixed release key; if you installed 0.4.0–0.4.2, uninstall it once before installing this version.
 
@@ -35,6 +39,7 @@ Native TorBox STRM app: browse the TorBox STRM web UI and play in a libmpv playe
 | --- | --- |
 | Windows 10/11 x64 | `TorBox-STRM-windows-x64-setup.exe` (installer, no admin rights, Start menu shortcut) or `TorBox-STRM-windows-x64-portable.zip` (extract the whole folder, then run `TorBoxSTRM.exe`). Uses the system WebView2 runtime. |
 | Linux x64 / arm64 | `TorBox-STRM-linux-*.tar.gz` (needs `libwebkit2gtk-4.1-0` and `libmpv2`, see README-linux.txt) |
+| iPhone / iPad (iOS 15+) | `TorBox-STRM-ios.ipa`: unsigned, install with TrollStore, AltStore, SideStore or your own certificate. Pair a TV by scanning its QR code (iOS blocks LAN discovery). |
 | Android 7.0+ | `TorBox-STRM-android-arm64-v8a.apk` for most phones and TV boxes; `armeabi-v7a` for older 32-bit devices |
 
 The Android APKs are signed with a @ANDROID_SIGNING@. Checksums are in `SHA256SUMS.txt`.

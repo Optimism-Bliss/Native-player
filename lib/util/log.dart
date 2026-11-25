@@ -6,6 +6,7 @@ import '../settings.dart';
 import 'fullscreen.dart';
 
 /// Android: set at start-up (app files folder) so the log can be read in the app.
+/// Log folder on phones (Android: app support dir; iOS: Documents, shown in the Files app).
 String? androidLogDir;
 
 /// Desktop builds have no console, so problems are also written to

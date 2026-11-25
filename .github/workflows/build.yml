@@ -167,6 +167,32 @@ jobs:
           path: dist/*.apk
           if-no-files-found: error
 
+  # Unsigned IPA (no Apple account): users sign it while installing (TrollStore, AltStore, SideStore, eSign…).
+  ios:
+    needs: check
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter config --no-analytics
+      - run: flutter build ios --release --no-codesign
+      - name: Package unsigned IPA
+        run: |
+          set -euo pipefail
+          mkdir -p dist/Payload
+          cp -R build/ios/iphoneos/Runner.app dist/Payload/
+          (cd dist && zip -qry TorBox-STRM-ios.ipa Payload && rm -rf Payload)
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TorBox-STRM-ios
+          path: dist/*.ipa
+          if-no-files-found: error
+
   # Android ships first; desktop builds are attached to the same release when done.
   release-android:
     if: github.event_name == 'push' && github.ref_type == 'tag'
@@ -219,3 +245,26 @@ jobs:
           cd release-assets
           sha256sum * > SHA256SUMS.txt
           gh release upload "$TAG" * --clobber
+
+  # Separate from the desktop job, so an iOS build problem never holds back the other platforms.
+  release-ios:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [ios, release-android]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: TorBox-STRM-ios
+          path: release-assets
+      - name: Attach the IPA and its checksum
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          cd release-assets
+          sha256sum TorBox-STRM-ios.ipa > TorBox-STRM-ios.ipa.sha256
+          gh release upload "$TAG" TorBox-STRM-ios.ipa TorBox-STRM-ios.ipa.sha256 --clobber

@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'log.dart';
 
-/// `torboxstrm://…` links handed to the app by Android (QR codes): `pair`
+/// `torboxstrm://…` links handed to the app by Android / iOS (QR codes): `pair`
 /// (phone ↔ TV) and `connect` (server code). Read once at start-up, then
 /// delivered as they arrive; screens take the ones they handle.
 class AppLinks {
@@ -16,7 +16,7 @@ class AppLinks {
   static Stream<String> get stream => _incoming.stream;
 
   static Future<void> init() async {
-    if (!Platform.isAndroid) return;
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'link' && call.arguments is String) {
         final link = call.arguments as String;

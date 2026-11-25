@@ -42,7 +42,12 @@ Future<void> checkForUpdate(BuildContext context, {bool automatic = false}) asyn
               ],
               if (release.asset == null) ...[
                 const SizedBox(height: 12),
-                const Text('Bản này chưa có file cho thiết bị của bạn; mở trang tải để xem.'),
+                Text(
+                  Platform.isIOS
+                      ? 'Trên iPhone / iPad: tải file TorBox-STRM-ios.ipa ở trang tải rồi cài đè bằng công cụ bạn đã dùng '
+                            '(TrollStore, AltStore, SideStore…). Dữ liệu và đăng nhập được giữ nguyên.'
+                      : 'Bản này chưa có file cho thiết bị của bạn; mở trang tải để xem.',
+                ),
               ],
             ],
           ),

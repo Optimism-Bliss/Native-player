@@ -31,6 +31,11 @@ Future<void> _start() async {
     try {
       androidLogDir = (await getApplicationSupportDirectory()).path;
     } catch (_) {}
+  } else if (Platform.isIOS) {
+    // Documents: visible in the Files app (On My iPhone › TorBox STRM) to send the log
+    try {
+      androidLogDir = (await getApplicationDocumentsDirectory()).path;
+    } catch (_) {}
   }
   appLog('start ${Platform.operatingSystem} ${Platform.operatingSystemVersion}');
   MediaKit.ensureInitialized();

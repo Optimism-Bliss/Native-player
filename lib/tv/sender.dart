@@ -61,7 +61,11 @@ class TvClient {
   final PairedTv tv;
   final HttpClient _http = HttpClient()..connectionTimeout = const Duration(seconds: 4);
 
-  static String get deviceName => Platform.isAndroid ? 'Điện thoại Android' : Platform.localHostname;
+  static String get deviceName => Platform.isAndroid
+      ? 'Điện thoại Android'
+      : Platform.isIOS
+      ? 'iPhone / iPad'
+      : Platform.localHostname;
 
   static Future<Object?> _send(
     HttpClient http,
