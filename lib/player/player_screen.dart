@@ -6,11 +6,13 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../bridge.dart';
 import '../util/device_controls.dart';
 import '../util/format.dart';
 import '../util/fullscreen.dart';
+import '../util/log.dart';
 import '../util/tv_mode.dart';
 import 'playback_controller.dart';
 import 'widgets/progress_bar.dart';
@@ -60,6 +62,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _overlay = true;
   Timer? _hideTimer;
   bool _closing = false;
+
+  /// Desktop: the video texture is taken out of the tree while the window
+  /// changes size (fullscreen on/off, closing). Resizing the Windows window
+  /// while libmpv keeps drawing into the texture froze the whole app
+  /// ("Not Responding", last frame stuck, stream still downloading).
+  bool _videoVisible = true;
+  bool _resizing = false;
   ({bool forward, int seconds})? _seekFlash;
   Timer? _seekFlashTimer;
   double? _volumeBeforeMute;
@@ -151,8 +160,56 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Future<void> _close() async {
     if (_closing) return;
     _closing = true;
+    appLog('player: close (fullscreen ${FullscreenHelper.isFullscreen.value})');
+    if (isDesktop) {
+      await _dropVideo();
+      try {
+        await c.player.pause().timeout(const Duration(seconds: 2));
+      } catch (_) {}
+      // Windows web window mode: the app window goes away anyway, so hide it
+      // first; leaving fullscreen then happens on a hidden window.
+      if (FullscreenHelper.escapeClosesPlayer) {
+        try {
+          await windowManager.hide();
+        } catch (e) {
+          appLog('player: hide window: $e');
+        }
+      }
+    }
     await FullscreenHelper.exitPlayer();
     if (mounted) Navigator.of(context).pop();
+  }
+
+  /// Takes the video texture out of the tree and waits until a frame without
+  /// it has been drawn.
+  Future<void> _dropVideo() async {
+    if (!mounted || !_videoVisible) return;
+    setState(() => _videoVisible = false);
+    // a hidden or minimized window draws no frame: do not wait forever
+    await WidgetsBinding.instance.endOfFrame.timeout(const Duration(milliseconds: 500), onTimeout: () {});
+  }
+
+  /// Fullscreen on/off from the player (button, F/F11, double click).
+  /// Windows web window mode: the player is fullscreen only (it sits over the
+  /// minimized web window); a small player window there makes no sense.
+  Future<void> _toggleFullscreen() async {
+    if (isDesktop && FullscreenHelper.escapeClosesPlayer) return;
+    if (!isDesktop) return FullscreenHelper.toggle();
+    if (_resizing || _closing) return;
+    _resizing = true;
+    final to = !FullscreenHelper.isFullscreen.value;
+    appLog('player: fullscreen -> $to');
+    try {
+      await _dropVideo();
+      await FullscreenHelper.set(to);
+      // let the window settle at its new size before the texture comes back
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    } catch (e) {
+      appLog('player: fullscreen: $e');
+    } finally {
+      _resizing = false;
+      if (mounted && !_closing) setState(() => _videoVisible = true);
+    }
   }
 
   Future<void> _onScaleStart(ScaleStartDetails d) async {
@@ -394,7 +451,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     } else if (key == LogicalKeyboardKey.keyM) {
       if (!repeat) act(_toggleMute);
     } else if (key == LogicalKeyboardKey.keyF || key == LogicalKeyboardKey.f11) {
-      if (!repeat) FullscreenHelper.toggle();
+      if (!repeat) _toggleFullscreen();
     } else if (key == LogicalKeyboardKey.keyN && !repeat) {
       if (c.hasNext) act(c.next);
     } else if (key == LogicalKeyboardKey.keyP && !repeat) {
@@ -539,15 +596,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Video(
-            controller: c.video,
-            controls: NoVideoControls,
-            fill: Colors.black,
-            fit: _fit.boxFit,
-            aspectRatio: _fit.aspectRatio,
-            // libass renders every subtitle format inside mpv (styled ASS included).
-            subtitleViewConfiguration: const SubtitleViewConfiguration(visible: false),
-          ),
+          if (_videoVisible)
+            Video(
+              controller: c.video,
+              controls: NoVideoControls,
+              fill: Colors.black,
+              fit: _fit.boxFit,
+              aspectRatio: _fit.aspectRatio,
+              // libass renders every subtitle format inside mpv (styled ASS included).
+              subtitleViewConfiguration: const SubtitleViewConfiguration(visible: false),
+            )
+          else
+            const ColoredBox(color: Colors.black),
           _gestureLayer(),
           _centerStatus(),
           IgnorePointer(
@@ -624,7 +684,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         _showOverlay();
         _focus.requestFocus();
       },
-      onDoubleTap: FullscreenHelper.toggle,
+      onDoubleTap: _toggleFullscreen,
     );
   }
 
@@ -830,14 +890,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       onPressed: _pickFit,
                       icon: const Icon(IconsaxPlusLinear.maximize_3),
                     ),
-                    ValueListenableBuilder<bool>(
-                      valueListenable: FullscreenHelper.isFullscreen,
-                      builder: (context, full, _) => IconButton(
-                        tooltip: full ? 'Thoát toàn màn hình' : 'Toàn màn hình',
-                        onPressed: FullscreenHelper.toggle,
-                        icon: Icon(full ? IconsaxPlusLinear.minus_square : IconsaxPlusLinear.maximize_4),
+                    if (!(isDesktop && FullscreenHelper.escapeClosesPlayer))
+                      ValueListenableBuilder<bool>(
+                        valueListenable: FullscreenHelper.isFullscreen,
+                        builder: (context, full, _) => IconButton(
+                          tooltip: full ? 'Thoát toàn màn hình' : 'Toàn màn hình',
+                          onPressed: _toggleFullscreen,
+                          icon: Icon(full ? IconsaxPlusLinear.minus_square : IconsaxPlusLinear.maximize_4),
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),

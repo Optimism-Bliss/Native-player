@@ -358,11 +358,32 @@ class _BrowserScreenState extends State<BrowserScreen> {
     }
   }
 
-  /// Web window closed: show the app window (menu, reopen, update, log).
+  /// Web window closed by the user: that is the app's main window, so the app
+  /// quits (no leftover "Cửa sổ web đã đóng" window). While a film plays the
+  /// player is left alone; the app quits when it closes (see [_openPlayer]).
   void _onWindowOpenChanged() {
-    if (_window?.isOpen.value == false) {
-      windowManager.show().then((_) => windowManager.focus()).catchError((_) {});
+    if (_window?.isOpen.value == false && !_playerOpen) {
+      appLog('web window closed: quitting');
+      unawaited(_quitDesktop());
     }
+  }
+
+  /// Desktop quit that cannot hang: stop libmpv (bounded), then end the
+  /// process so no stream keeps downloading in the background.
+  Future<void> _quitDesktop() async {
+    try {
+      final pending = PlayerHost.existing;
+      if (pending != null) {
+        final host = await pending.timeout(const Duration(seconds: 1));
+        await host.player.stop().timeout(const Duration(seconds: 2));
+      }
+    } catch (e) {
+      appLog('quit: stop player: $e');
+    }
+    try {
+      await _window?.close().timeout(const Duration(seconds: 2));
+    } catch (_) {}
+    exit(0);
   }
 
   Future<void> _reload() async => _external ? _window!.reload() : _web.reload();
@@ -705,6 +726,9 @@ class _BrowserScreenState extends State<BrowserScreen> {
         if (_window!.isOpen.value) {
           WebWindowNative.restore();
           await windowManager.hide();
+        } else {
+          // the web window was closed while the film played
+          await _quitDesktop();
         }
       } catch (_) {}
     }
@@ -831,7 +855,11 @@ class _BrowserScreenState extends State<BrowserScreen> {
       case 'scan':
         await _scanQr();
       case 'quit':
-        await SystemNavigatorPop.pop();
+        if (isDesktop) {
+          await _quitDesktop();
+        } else {
+          await SystemNavigatorPop.pop();
+        }
       default:
         await _onTvMenu(choice);
     }

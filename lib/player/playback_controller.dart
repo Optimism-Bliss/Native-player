@@ -37,6 +37,9 @@ class PlayerHost {
 
   static Future<PlayerHost> get() => _instance ??= _create();
 
+  /// The shared player if one was created (quitting must not start libmpv).
+  static Future<PlayerHost>? get existing => _instance;
+
   static Future<PlayerHost> _create() async {
     MediaKit.ensureInitialized();
     final player = Player(
