@@ -119,6 +119,11 @@ Có hình sau 2,7 s (tập đang xem dở, đã xin sẵn link) / 6,0 s / 9,8 s 
 - Cấu trúc mã: base32 Crockford của `[1][địa chỉ][CRC-16/CCITT]`, XOR khoá cố định (`lib/connect_code.dart`, `src/appcode.rs`, có test vector chung). Mã chỉ làm rối địa chỉ, **không phải mã hoá**; ai cố tình vẫn tìm ra được, vì app phải kết nối tới địa chỉ đó và chứng chỉ HTTPS được công bố công khai.
 - App: ô "Địa chỉ hoặc mã máy chủ" nhận mã (gõ thường, dấu cách, nhầm O/0, I/1 vẫn đọc được; sai một ký tự thì báo lỗi). QR mở app qua intent filter `torboxstrm://connect`. Đã thêm bằng mã thì app không hiện địa chỉ: thanh công cụ, menu, lỗi và tiêu đề cửa sổ web đều hiện "Máy chủ riêng"; nhật ký thay host bằng `[máy chủ]`.
 
+## TV không có camera: TV hiện QR, điện thoại quét
+
+- **Máy chủ cho TV:** khi điện thoại ghép đôi với TV (QR trên TV hoặc nhập mã), điện thoại gửi mã máy chủ (`POST /server` trên TV). TV lưu như khi kết nối bằng mã, nên cũng không hiện địa chỉ.
+- **Đăng nhập trên TV** (server, nhánh `feat/device-login`): trang /login có nút "📱 Đăng nhập bằng điện thoại", hiện QR + mã 8 ký tự (`POST /login/device/start`). Điện thoại mở `/device?c=MÃ` (đăng nhập nếu chưa) và bấm "Cho phép". TV hỏi `/login/device/poll`; câu trả lời "approved" đặt cookie phiên 30 ngày. Mã sống 10 phút, dùng một lần, giới hạn 20 yêu cầu / 10 phút / IP. Đã thử trọn luồng bằng curl và trong app Linux: bấm Cho phép, app tự vào trang chủ.
+
 ## Làm sau
 
 Từ bản rà soát mô tả bàn giao ban đầu:

@@ -9,6 +9,7 @@ import '../player/playback_controller.dart';
 import '../player/player_screen.dart';
 import '../screens/browser_screen.dart';
 import '../screens/connect_screen.dart';
+import '../settings.dart';
 import '../util/log.dart';
 import 'receiver.dart';
 
@@ -23,7 +24,21 @@ class TvHome extends StatefulWidget {
 }
 
 class _TvHomeState extends State<TvHome> {
-  late final TvReceiver _rx = TvReceiver(openPlayer: _openPlayer, name: 'TorBox STRM TV');
+  late final TvReceiver _rx = TvReceiver(openPlayer: _openPlayer, name: 'TorBox STRM TV', onServer: _setServer);
+  late Uri? _server = widget.server;
+
+  Future<void> _setServer(Uri server, String code) async {
+    final changed = _server?.origin != server.origin;
+    await ServerStore.save(server, viaCode: code);
+    if (!mounted) return;
+    setState(() => _server = server);
+    if (changed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Điện thoại đã gửi máy chủ cho TV. Bấm "Duyệt phim trên TV" để đăng nhập.')),
+      );
+    }
+  }
+
   bool _playerOpen = false;
   Timer? _addressTimer;
 
@@ -82,7 +97,7 @@ class _TvHomeState extends State<TvHome> {
   }
 
   void _browse() {
-    final server = widget.server;
+    final server = _server;
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => server == null ? const ConnectScreen() : BrowserScreen(server: server)),
     );
@@ -125,6 +140,13 @@ class _TvHomeState extends State<TvHome> {
                           )
                         else
                           Text('TV chưa có mạng Wi-Fi / LAN.', style: text.bodyLarge?.copyWith(color: scheme.error)),
+                        const SizedBox(height: 8),
+                        Text(
+                          _server == null
+                              ? 'TV chưa có máy chủ: kết nối điện thoại (đã vào máy chủ) là TV nhận luôn.'
+                              : 'Máy chủ: đã có (${ServerStore.label(_server!)}). Đăng nhập trên TV: "Duyệt phim trên TV" → "Đăng nhập bằng điện thoại".',
+                          style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
                         if (_rx.lastPhone.value != null) ...[
                           const SizedBox(height: 12),
                           Text(

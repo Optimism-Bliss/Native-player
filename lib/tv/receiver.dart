@@ -7,6 +7,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../bridge.dart';
+import '../connect_code.dart';
 import '../player/player_screen.dart';
 import '../player/widgets/track_sheets.dart';
 import '../util/log.dart';
@@ -18,9 +19,13 @@ typedef OpenPlayer = Future<void> Function(PlayRequest request);
 /// The TV side of "Play on TV": a small HTTP server on the local network.
 /// See protocol.dart for the message flow.
 class TvReceiver {
-  TvReceiver({required this.openPlayer, required this.name});
+  TvReceiver({required this.openPlayer, required this.name, this.onServer});
 
   final OpenPlayer openPlayer;
+
+  /// A paired phone told the TV which server it uses (as a server code, so
+  /// the TV keeps the address hidden too).
+  final Future<void> Function(Uri server, String code)? onServer;
   final String name;
 
   /// The open player (set by PlayerScreen), driven by remote commands.
@@ -211,6 +216,13 @@ class TvReceiver {
       switch ((req.method, path)) {
         case ('POST', '/play'):
           return await _play(req);
+        case ('POST', '/server'):
+          final body = await _body(req);
+          final code = body['code'];
+          final server = code is String ? decodeServerCode(code) : null;
+          if (server == null) throw const FormatException('Mã máy chủ không hợp lệ');
+          await onServer?.call(server, encodeServerCode(server));
+          return await _json(res, {'ok': true});
         case ('POST', '/page'):
           final body = await _body(req);
           final msg = body['msg'];

@@ -144,6 +144,15 @@ class _BrowserScreenState extends State<BrowserScreen> {
     try {
       final tv = await TvClient.pair(link);
       await PairedTv.save(tv);
+      // the TV gets this server too (as a server code: its address stays hidden there)
+      final c = TvClient(tv);
+      try {
+        await c.setServer(ServerStore.code ?? encodeServerCode(widget.server));
+      } on TvError catch (e) {
+        appLog('send server to TV: ${e.message}');
+      } finally {
+        c.close();
+      }
       if (!mounted) return;
       setState(() => _tv = tv);
       _snack('Đã kết nối ${tv.name}. Bấm ▶ trên phim để chọn "Phát trên TV".');

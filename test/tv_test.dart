@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:torbox_strm_player/bridge.dart';
+import 'package:torbox_strm_player/connect_code.dart';
 import 'package:torbox_strm_player/tv/protocol.dart';
 import 'package:torbox_strm_player/tv/receiver.dart';
 import 'package:torbox_strm_player/tv/sender.dart';
@@ -38,9 +39,14 @@ void main() {
   group('receiver over HTTP', () {
     late TvReceiver rx;
     final played = <PlayRequest>[];
+    final servers = <Uri>[];
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
-      rx = TvReceiver(openPlayer: (r) async => played.add(r), name: 'Test TV');
+      rx = TvReceiver(
+        openPlayer: (r) async => played.add(r),
+        name: 'Test TV',
+        onServer: (u, code) async => servers.add(u),
+      );
       await rx.start();
     });
     tearDown(() => rx.stop());
@@ -109,6 +115,11 @@ void main() {
       expect(r.state.active, isTrue);
       final r2 = await c.poll(r.seq);
       expect(r2.events, isEmpty);
+
+      // the phone hands its server to the TV as a server code
+      await c.setServer(encodeServerCode(Uri.parse('https://media.example.com/')));
+      expect(servers.single, Uri.parse('https://media.example.com/'));
+      await expectLater(c.setServer('TBS1-XXXX'), throwsA(isA<TvError>()));
 
       // commands need an open player
       await expectLater(c.command('toggle'), throwsA(isA<TvError>()));
