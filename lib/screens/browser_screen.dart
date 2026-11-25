@@ -417,7 +417,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
       await _web.tryAddUserScript(
         WebViewUserScript(
           source:
-              'window.TorBoxStrmApp=Object.freeze({v:$bridgeVersion,platform:${jsonEncode(_platform)},tv:$isTvDevice});',
+              'window.TorBoxStrmApp=Object.freeze({v:$bridgeVersion,platform:${jsonEncode(_platform)},tv:$isTvDevice,screen:${screenJs()}});',
         ),
       );
     });

@@ -10,6 +10,7 @@ import 'package:webview_all/webview_all.dart' show WebViewJavaScriptCall, WebVie
 import '../bridge.dart';
 import '../settings.dart';
 import '../util/log.dart';
+import '../util/tv_mode.dart';
 
 /// Windows: the web UI in its own native WebView2 window instead of inside the
 /// Flutter window. The embedded WebView draws through Windows Graphics
@@ -70,7 +71,7 @@ class WebWindow {
   dw.addEventListener('torboxEvent', (e) => {
     if (window.TorBoxStrmBridge) window.TorBoxStrmBridge.event(e);
   });
-  Object.defineProperty(window, 'TorBoxStrmApp', {value: Object.freeze({v: $bridgeVersion, platform: ${jsonEncode(Platform.operatingSystem)}})});
+  Object.defineProperty(window, 'TorBoxStrmApp', {value: Object.freeze({v: $bridgeVersion, platform: ${jsonEncode(Platform.operatingSystem)}, screen: ${screenJs()}})});
   Object.defineProperty(window, 'webviewAll', {value: Object.freeze({
     callHandler(name, msg) {
       const id = ++seq;
