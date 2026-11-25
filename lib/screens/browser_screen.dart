@@ -772,37 +772,45 @@ class _BrowserScreenState extends State<BrowserScreen> {
   Future<void> _showAppMenu() async {
     final choice = await showModalBottomSheet<String>(
       context: context,
+      // the list is longer than a phone's bottom sheet: let it grow and scroll (the TV items were cut off)
+      isScrollControlled: true,
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(widget.server.scheme == 'https' ? IconsaxPlusLinear.lock_1 : IconsaxPlusLinear.unlock),
-              title: Text(ServerStore.label(widget.server)),
-              subtitle: Text(_version.isEmpty ? 'TorBox STRM' : 'TorBox STRM $_version'),
-            ),
-            const Divider(height: 1),
-            for (final (value, icon, label) in [
-              ('reload', IconsaxPlusLinear.refresh, 'Tải lại trang'),
-              ('home', IconsaxPlusLinear.home_2, 'Về trang chủ'),
-              ('server', IconsaxPlusLinear.global_edit, 'Đổi máy chủ'),
-              ('signout', IconsaxPlusLinear.logout, 'Đăng xuất'),
-              ('update', IconsaxPlusLinear.refresh_circle, 'Kiểm tra cập nhật'),
-              ('log', IconsaxPlusLinear.document_text, 'Nhật ký'),
-              if (QrScanScreen.available && !isTvDevice)
-                ('scan', IconsaxPlusLinear.scan_barcode, 'Quét mã QR (ghép TV, đăng nhập TV, mã máy chủ)'),
-              if (Platform.isAndroid) ('role', IconsaxPlusLinear.monitor_mobbile, 'Dùng máy này làm TV'),
-              if (DecodePrefs.available)
-                (
-                  'decode',
-                  IconsaxPlusLinear.cpu,
-                  DecodePrefs.direct ? 'Giải mã: trực tiếp (đổi sang GPU)' : 'Giải mã: GPU (đổi sang trực tiếp)',
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.85),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: Icon(widget.server.scheme == 'https' ? IconsaxPlusLinear.lock_1 : IconsaxPlusLinear.unlock),
+                  title: Text(ServerStore.label(widget.server)),
+                  subtitle: Text(_version.isEmpty ? 'TorBox STRM' : 'TorBox STRM $_version'),
                 ),
-              ('quit', IconsaxPlusLinear.close_circle, 'Thoát app'),
-            ])
-              ListTile(leading: Icon(icon), title: Text(label), onTap: () => Navigator.pop(context, value)),
-            if (_canCast) ..._tvMenuTiles(context),
-          ],
+                // paired TV first: remote, its log
+                if (_canCast) ..._tvMenuTiles(context),
+                const Divider(height: 1),
+                for (final (value, icon, label) in [
+                  ('reload', IconsaxPlusLinear.refresh, 'Tải lại trang'),
+                  ('home', IconsaxPlusLinear.home_2, 'Về trang chủ'),
+                  ('server', IconsaxPlusLinear.global_edit, 'Đổi máy chủ'),
+                  ('signout', IconsaxPlusLinear.logout, 'Đăng xuất'),
+                  ('update', IconsaxPlusLinear.refresh_circle, 'Kiểm tra cập nhật'),
+                  ('log', IconsaxPlusLinear.document_text, 'Nhật ký'),
+                  if (QrScanScreen.available && !isTvDevice)
+                    ('scan', IconsaxPlusLinear.scan_barcode, 'Quét mã QR (ghép TV, đăng nhập TV, mã máy chủ)'),
+                  if (Platform.isAndroid) ('role', IconsaxPlusLinear.monitor_mobbile, 'Dùng máy này làm TV'),
+                  if (DecodePrefs.available)
+                    (
+                      'decode',
+                      IconsaxPlusLinear.cpu,
+                      DecodePrefs.direct ? 'Giải mã: trực tiếp (đổi sang GPU)' : 'Giải mã: GPU (đổi sang trực tiếp)',
+                    ),
+                  ('quit', IconsaxPlusLinear.close_circle, 'Thoát app'),
+                ])
+                  ListTile(leading: Icon(icon), title: Text(label), onTap: () => Navigator.pop(context, value)),
+              ],
+            ),
+          ),
         ),
       ),
     );
