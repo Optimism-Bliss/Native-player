@@ -75,6 +75,11 @@ class PlayerHost {
       await native.setProperty('alang', 'vi,vie,vn,en,eng,ja,jpn');
       if (defaultTargetPlatform == TargetPlatform.android) {
         await native.setProperty('ao', 'audiotrack');
+        // DTS-HD Master Audio: decode only its DTS core. The lossless extension is decoded on the
+        // CPU and is too heavy for TV boxes with small cores (onn 4K: 4x Cortex-A35), which made
+        // picture and sound stutter although the video decoder kept up. Through TV / monitor
+        // speakers the core sounds the same.
+        await native.setProperty('ad-lavc-o', 'core_only=1');
       }
       await native.observeProperty('aid', (v) async => host.active.value = host.active.value.copyWith(audio: v));
       await native.observeProperty('sid', (v) async => host.active.value = host.active.value.copyWith(subtitle: v));
