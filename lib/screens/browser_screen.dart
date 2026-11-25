@@ -12,8 +12,10 @@ import 'package:webview_all_android/webview_all_android.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../bridge.dart';
+import '../player/native_tv_player.dart';
 import '../player/playback_controller.dart';
 import '../player/player_screen.dart';
+import '../player/tv_playback_prefs.dart';
 import '../connect_code.dart';
 import '../settings.dart';
 import '../tv/protocol.dart';
@@ -696,6 +698,27 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
   Future<void> _openPlayer(PlayRequest request) async {
     _playerOpen = true;
+    // Android TV browsing on the TV itself: the same Media3 player as "Play on TV".
+    if (TvPlaybackPrefs.nativePlayer) {
+      final player = NativeTvPlayer(
+        request: request,
+        page: PageLink(incoming: _toPlayer.stream, send: _sendEvent),
+        onProgress: (key, pos, dur) => _sendEvent({
+          'type': 'progress',
+          'key': key,
+          'pos': pos.inMilliseconds / 1000,
+          'dur': dur.inMilliseconds / 1000,
+        }),
+      );
+      try {
+        await player.run();
+      } catch (e) {
+        appLog('native player: $e');
+      }
+      _playerOpen = false;
+      await _sendEvent({'type': 'closed', 'key': request.queue[request.index].key});
+      return;
+    }
     if (_external) {
       await _raisePlayerWindow();
       if (!mounted) return;

@@ -14,6 +14,7 @@ import '../util/format.dart';
 import '../util/fullscreen.dart';
 import '../util/log.dart';
 import '../util/tv_mode.dart';
+import 'native_tv_player.dart';
 import 'playback_controller.dart';
 import 'widgets/progress_bar.dart';
 import 'widgets/track_sheets.dart';
@@ -25,6 +26,9 @@ import 'widgets/track_sheets.dart';
 /// Lets something outside the screen (the TV receiver) drive the open player.
 class PlayerRemote {
   PlaybackController? controller;
+
+  /// Android TV: the Media3 player is open instead of [controller].
+  NativeTvPlayer? native;
   Future<void> Function()? close;
 }
 

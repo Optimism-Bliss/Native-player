@@ -27,6 +27,28 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         pendingLink = pairLink(intent)
+        // Android TV: Media3 player in its own activity (NativePlayerActivity).
+        val native = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "torboxstrm/native_player")
+        NativePlayerBridge.channel = native
+        native.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "open" -> {
+                    val args = call.arguments as? Map<*, *> ?: return@setMethodCallHandler result.success(false)
+                    // a new title replaces the one playing
+                    NativePlayerBridge.activity?.command("stop", emptyMap<String, Any>())
+                    NativePlayerBridge.pendingArgs = args
+                    startActivity(Intent(this, NativePlayerActivity::class.java))
+                    result.success(true)
+                }
+                "command" -> {
+                    val player = NativePlayerBridge.activity
+                        ?: return@setMethodCallHandler result.success("Trình phát đã đóng")
+                    val args = call.arguments as? Map<*, *> ?: emptyMap<String, Any>()
+                    result.success(player.command(args["action"] as? String ?: "", args))
+                }
+                else -> result.notImplemented()
+            }
+        }
         // Opens the web UI's "intent://…" links for external players (VLC, MX Player…)
         // exactly as Chrome would, including S.browser_fallback_url.
         channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "torboxstrm/intent")
@@ -91,6 +113,11 @@ class MainActivity : FlutterActivity() {
             "back" -> KeyEvent.KEYCODE_BACK
             "playpause" -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
             else -> return false
+        }
+        // the TV player is on top: the key goes to it
+        NativePlayerBridge.activity?.let { player ->
+            player.runOnUiThread { player.pressKey(code) }
+            return true
         }
         runOnUiThread {
             val t = SystemClock.uptimeMillis()

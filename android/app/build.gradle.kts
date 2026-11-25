@@ -49,6 +49,13 @@ android {
         }
     }
 
+    // media_kit (libmpv) and libass both ship the NDK C++ runtime.
+    packaging {
+        jniLibs {
+            pickFirsts += "**/libc++_shared.so"
+        }
+    }
+
     buildTypes {
         release {
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
@@ -69,4 +76,11 @@ flutter {
 dependencies {
     // FileProvider for installing downloaded updates.
     implementation("androidx.core:core:1.13.1")
+    // Android TV player (NativePlayerActivity), the same stack as Fladder's TV player.
+    val media3 = "1.11.1"
+    implementation("androidx.media3:media3-exoplayer:$media3")
+    implementation("androidx.media3:media3-exoplayer-hls:$media3")
+    implementation("androidx.media3:media3-ui:$media3")
+    implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.9.0+1")
+    implementation("io.github.peerless2012:ass-media:0.5.1")
 }
