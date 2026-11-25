@@ -32,6 +32,9 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
             </intent-filter>
+            <!-- torboxstrm:// links are handled by MainActivity's channel (lib/util/links.dart); Flutter's own
+                 deep linking would push them as a named route, which this app has none of, and crash. -->
+            <meta-data android:name="flutter_deeplinking_enabled" android:value="false" />
             <!-- Pairing a phone with a TV: the TV's QR page opens torboxstrm://pair?... -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>

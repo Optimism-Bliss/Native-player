@@ -511,6 +511,10 @@ Future<void> showPlaybackInfo(BuildContext context, Player player, ActiveTracks 
   final hwdec = await prop('hwdec-current');
   final vo = await prop('current-vo');
   final container = await prop('file-format');
+  final drops = await prop('frame-drop-count');
+  final decoderDrops = await prop('decoder-frame-drop-count');
+  final fps = double.tryParse(await prop('estimated-vf-fps'));
+  final cache = double.tryParse(await prop('demuxer-cache-duration'));
   if (!context.mounted) return;
   final v = player.state.videoParams;
   final tracks = player.state.tracks;
@@ -531,7 +535,15 @@ Future<void> showPlaybackInfo(BuildContext context, Player player, ActiveTracks 
     ('Màu', [v.primaries, v.gamma, v.colormatrix].whereType<String>().join(' · ')),
     ('Tín hiệu HDR', hdrLabel(v.primaries, v.gamma).isEmpty ? 'SDR' : hdrLabel(v.primaries, v.gamma)),
     ('Giải mã phần cứng', hwdec.isEmpty || hwdec == 'no' ? 'Không (giải mã mềm)' : hwdec),
-    ('Video output', vo),
+    ('Video output', vo == 'mediacodec_embed' ? 'Trực tiếp (mediacodec_embed)' : vo),
+    (
+      'Khung hình',
+      [
+        if (fps != null) '${fps.toStringAsFixed(1)} fps',
+        'rơi ${drops.isEmpty ? '0' : drops} (hiển thị) / ${decoderDrops.isEmpty ? '0' : decoderDrops} (giải mã)',
+      ].join(' · '),
+    ),
+    ('Bộ đệm', cache == null ? '' : '${cache.toStringAsFixed(0)} giây'),
     ('Âm thanh', audioTrack == null ? 'Không có' : audioTrackLabel(audioTrack)),
     ('Phụ đề', subTrack == null ? 'Tắt' : subtitleTrackLabel(subTrack)),
   ];

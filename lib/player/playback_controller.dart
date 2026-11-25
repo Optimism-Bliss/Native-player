@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../bridge.dart';
+import 'decode_prefs.dart';
 import '../util/log.dart';
 import '../util/format.dart';
 
@@ -47,9 +48,13 @@ class PlayerHost {
         logLevel: MPVLogLevel.warn,
       ),
     );
+    final direct = DecodePrefs.direct;
+    appLog('player: ${direct ? 'direct decode (mediacodec_embed)' : 'gpu output'}');
     final video = VideoController(
       player,
-      configuration: const VideoControllerConfiguration(enableHardwareAcceleration: true),
+      configuration: direct
+          ? const VideoControllerConfiguration(vo: 'mediacodec_embed', hwdec: 'mediacodec')
+          : const VideoControllerConfiguration(enableHardwareAcceleration: true),
     );
     final host = PlayerHost._(player, video);
     final native = player.platform;

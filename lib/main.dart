@@ -16,6 +16,7 @@ import 'util/fullscreen.dart';
 import 'util/links.dart';
 import 'util/log.dart';
 import 'util/tv_mode.dart';
+import 'player/decode_prefs.dart';
 
 Future<void> main() async {
   runZonedGuarded(_start, (error, stack) => appLog('uncaught: $error\n$stack'));
@@ -56,6 +57,7 @@ Future<void> _start() async {
   }
   if (Platform.isWindows) await prepareWindowsWebView();
   await detectTv();
+  await DecodePrefs.load();
   await AppLinks.init();
   var server = await ServerStore.load();
   // opened from a server code QR (torboxstrm://connect?c=...) before any server was set

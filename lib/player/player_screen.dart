@@ -15,6 +15,7 @@ import '../util/tv_mode.dart';
 import 'playback_controller.dart';
 import 'widgets/progress_bar.dart';
 import 'widgets/track_sheets.dart';
+import 'decode_prefs.dart';
 
 /// Full-screen player. Layout and interactions follow Fladder's DesktopControls:
 /// gradient top bar with the title, a bottom panel with progress, info chips,
@@ -545,8 +546,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
             fill: Colors.black,
             fit: _fit.boxFit,
             aspectRatio: _fit.aspectRatio,
-            // libass renders every subtitle format inside mpv (styled ASS included).
-            subtitleViewConfiguration: const SubtitleViewConfiguration(visible: false),
+            // libass renders every subtitle format inside mpv (styled ASS included); with direct
+            // decoding mpv cannot draw on the picture, so Flutter shows the text instead.
+            subtitleViewConfiguration: SubtitleViewConfiguration(visible: DecodePrefs.direct),
           ),
           _gestureLayer(),
           _centerStatus(),
