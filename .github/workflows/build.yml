@@ -244,7 +244,9 @@ jobs:
           set -euo pipefail
           cd release-assets
           sha256sum * > SHA256SUMS.txt
-          gh release upload "$TAG" * --clobber
+          # APKs (release-android) and the IPA (release-ios) are already on the release: uploading
+          # them again with --clobber deletes them for a moment, and an app updating right then got 404
+          gh release upload "$TAG" $(ls | grep -vE '\.(apk|ipa)$') --clobber
 
   # Separate from the desktop job, so an iOS build problem never holds back the other platforms.
   release-ios:

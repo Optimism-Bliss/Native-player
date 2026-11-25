@@ -189,6 +189,10 @@ class Updater {
       final req = await client.getUrl(asset.url);
       req.headers.set(HttpHeaders.userAgentHeader, 'TorBoxSTRM-app');
       final res = await req.close();
+      if (res.statusCode == 404) {
+        await res.drain<void>();
+        throw const HttpException('Bản mới đang được đưa lên GitHub. Thử lại sau 1–2 phút.');
+      }
       if (res.statusCode != 200) throw HttpException('HTTP ${res.statusCode}', uri: asset.url);
       final total = res.contentLength > 0 ? res.contentLength : asset.size;
       final sink = file.openWrite();

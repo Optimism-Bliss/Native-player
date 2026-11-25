@@ -115,7 +115,7 @@ Future<void> _downloadAndInstall(BuildContext context, AppRelease release) async
   } catch (e) {
     appLog('update failed: $e');
     navigator.pop();
-    messenger.showSnackBar(SnackBar(content: Text('Không cập nhật được: $e')));
+    messenger.showSnackBar(SnackBar(content: Text('Không cập nhật được: ${e is HttpException ? e.message : e}')));
   } finally {
     progress.dispose();
   }
