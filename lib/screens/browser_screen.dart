@@ -629,7 +629,11 @@ class _BrowserScreenState extends State<BrowserScreen> {
           return {'ok': true};
       }
       final request = PlayRequest.parse(raw, widget.server);
-      if (_playerOpen) return {'ok': false, 'error': 'Trình phát đang mở'};
+      if (_playerOpen) {
+        // Windows: the player may sit behind the web window; bring it back instead of refusing
+        if (_external) unawaited(_raisePlayerWindow());
+        return {'ok': false, 'error': 'Trình phát đang mở'};
+      }
       if (_canCast && _tv != null) {
         _chooseTarget(request, raw!);
       } else {
@@ -641,18 +645,24 @@ class _BrowserScreenState extends State<BrowserScreen> {
     }
   }
 
+  /// Web UI in its own window (Windows): the app window plays. Windows does not
+  /// let a hidden window simply take the foreground, so it stays above the web
+  /// window (always on top) while the player is open, in full screen.
+  Future<void> _raisePlayerWindow() async {
+    try {
+      await windowManager.show();
+      await windowManager.setAlwaysOnTop(true);
+      await windowManager.focus();
+      await FullscreenHelper.set(true);
+    } catch (e) {
+      appLog('raise player window: $e');
+    }
+  }
+
   Future<void> _openPlayer(PlayRequest request) async {
     _playerOpen = true;
-    // web UI in its own window: bring the player's window to the front
     if (_external) {
-      try {
-        await windowManager.show();
-        await windowManager.focus();
-        // play over everything instead of a second small window on top of the web window
-        await FullscreenHelper.set(true);
-      } catch (e) {
-        appLog('focus player window: $e');
-      }
+      await _raisePlayerWindow();
       if (!mounted) return;
     }
     await Navigator.of(context).push(
@@ -674,11 +684,11 @@ class _BrowserScreenState extends State<BrowserScreen> {
       ),
     );
     _playerOpen = false;
-    // back to the web window
-    if (_external && _window!.isOpen.value) {
+    if (_external) {
       try {
-        // PlayerScreen already left fullscreen
-        await windowManager.hide();
+        await windowManager.setAlwaysOnTop(false);
+        // back to the web window (PlayerScreen already left fullscreen)
+        if (_window!.isOpen.value) await windowManager.hide();
       } catch (_) {}
     }
   }
@@ -733,6 +743,12 @@ class _BrowserScreenState extends State<BrowserScreen> {
       } catch (_) {}
     }
     if (mounted) await _showAppMenu();
+    // menu done: back to the web window only, no empty app window left behind it
+    if (_external && !_playerOpen && (_window?.isOpen.value ?? false)) {
+      try {
+        await windowManager.hide();
+      } catch (_) {}
+    }
   }
 
   Future<void> _showAppMenu() async {
