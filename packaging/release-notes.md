@@ -1,3 +1,11 @@
+**Có gì mới trong 2.0.3**
+- **Quét QR ngay trong app** (điện thoại): menu → "Quét mã QR", hoặc nút quét ở màn hình nhập máy chủ. Đọc QR ghép TV, QR đăng nhập TV và mã máy chủ; dùng khi camera của máy mở link `torboxstrm://` bằng trình duyệt. Lần đầu app xin quyền camera.
+- **Sửa link đăng nhập TV** (`torboxstrm://device`) không mở được app trên Android.
+- **Phụ đề ở chế độ giải mã trực tiếp (TV):** app tự vẽ phụ đề trên cùng (chữ trắng viền đen); phụ đề dạng ảnh (PGS / VobSub) có thông báo thay vì không hiện gì.
+- **Remote trên điện thoại tự kết nối lại** khi bật màn hình hoặc bấm phím.
+- **Windows:** trình phát luôn hiện trên cửa sổ web khi bấm ▶ (trước đây nằm phía sau); đóng menu app không còn để lại cửa sổ trống.
+- **TV box ít RAM:** bộ đệm phát trên TV giảm còn 64 MB để Android không tắt app; nhật ký ghi RAM còn trống và lý do lần chạy trước bị tắt (thiếu RAM, crash…).
+
 **Có gì mới trong 2.0.2** (tự chọn bản theo màn hình cần server `2.0.3-dev` trở lên)
 - **Tua bằng remote trên thanh tiến trình:** ▲ ▼ di chuyển lên thanh tiến trình, ◀ ▶ tua xem trước (giờ hiện trên thanh, giữ phím thì tua 10 giây → 30 giây → 1 phút), bấm OK hoặc dừng tay là nhảy tới đó.
 - **TV box giải mã nhẹ hơn:** âm thanh DTS-HD Master Audio chỉ giải mã phần lõi DTS (phần lossless chạy bằng CPU, quá nặng với box như onn 4K và làm giật cả hình); nghe qua loa TV không khác.
