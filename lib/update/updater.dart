@@ -126,12 +126,12 @@ class Updater {
   }
 
   /// Release newer than this build, or null. With [automatic], respects
-  /// "skip this version" and checks at most every 6 hours.
+  /// "skip this version" and checks at most every 30 minutes.
   static Future<AppRelease?> available({bool automatic = false}) async {
     final prefs = await SharedPreferences.getInstance();
     if (automatic) {
       final last = prefs.getInt(_lastCheckKey) ?? 0;
-      if (DateTime.now().millisecondsSinceEpoch - last < const Duration(hours: 6).inMilliseconds) return null;
+      if (DateTime.now().millisecondsSinceEpoch - last < const Duration(minutes: 30).inMilliseconds) return null;
     }
     final release = await latest();
     await prefs.setInt(_lastCheckKey, DateTime.now().millisecondsSinceEpoch);

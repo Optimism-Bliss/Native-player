@@ -400,7 +400,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     } else if (key == LogicalKeyboardKey.keyP && !repeat) {
       if (c.hasPrevious) act(c.previous);
     } else if (key == LogicalKeyboardKey.escape) {
-      if (FullscreenHelper.isFullscreen.value && isDesktop) {
+      if (FullscreenHelper.isFullscreen.value && isDesktop && !FullscreenHelper.escapeClosesPlayer) {
         FullscreenHelper.set(false);
       } else {
         _close();

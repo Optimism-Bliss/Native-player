@@ -96,6 +96,13 @@ Các việc đã gây chậm:
 
 Cần đo trên máy thật để biết thời gian còn lại nằm ở đâu: TorBox, CDN, proxy, hay mpv tua tới vị trí xem dở trên file MKV lớn.
 
+## Bản tiếp theo: Windows và cập nhật trên Android
+
+- **Windows, cửa sổ web riêng:** cửa sổ app **ẩn hẳn** khi duyệt phim (chỉ còn một cửa sổ trên thanh tác vụ). Bấm ▶ thì hiện lại và **toàn màn hình**; Esc hoặc nút đóng player trả về cửa sổ web (`FullscreenHelper.escapeClosesPlayer`). Lệnh ẩn chờ `appWindowShown` (main() hiện cửa sổ sau khung hình đầu; ẩn trước thời điểm đó sẽ bị hiện lại).
+- **Cập nhật:** app tự kiểm tra tối đa 30 phút một lần (trước là 6 giờ), cả khi quay lại app. Trước đây người vừa cập nhật vài giờ trước không thấy bản mới.
+- **Menu của app trên điện thoại:** trước chỉ mở bằng Back ở trang đầu. Giờ thêm mục "📱 Ứng dụng (cập nhật, máy chủ, TV)" trong menu tài khoản của trang web (chỉ hiện trong app); trang gửi `{type:'menu'}` qua cầu nối.
+- Đã thử trên Linux: mục Ứng dụng mở bảng menu; chế độ cửa sổ web: app ẩn, ▶ toàn màn hình, Esc về cửa sổ web.
+
 ## Làm sau
 
 Từ bản rà soát mô tả bàn giao ban đầu:

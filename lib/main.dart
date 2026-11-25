@@ -44,6 +44,7 @@ Future<void> _start() async {
         () async {
           await windowManager.show();
           await windowManager.focus();
+          if (!appWindowShown.isCompleted) appWindowShown.complete();
         },
       ),
     );

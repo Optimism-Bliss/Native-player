@@ -8,7 +8,7 @@ import '../util/log.dart';
 import 'updater.dart';
 
 /// Checks GitHub Releases and offers the update. [automatic] runs quietly at
-/// startup (at most every 6 hours, honours "skip this version"); a manual
+/// startup (at most every 30 minutes, honours "skip this version"); a manual
 /// check also says when the app is already up to date.
 Future<void> checkForUpdate(BuildContext context, {bool automatic = false}) async {
   final release = await Updater.available(automatic: automatic);

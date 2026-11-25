@@ -49,6 +49,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
   bool _playerOpen = false;
   String _version = '';
   bool _loaded = false;
+  AppLifecycleListener? _lifecycle;
 
   /// Windows: the web UI runs in its own native window (see web_window.dart).
   WebWindow? _window;
@@ -71,10 +72,16 @@ class _BrowserScreenState extends State<BrowserScreen> {
   void initState() {
     super.initState();
     _start();
-    // Quiet update check shortly after start (GitHub Releases, at most every 6 h).
+    // Quiet update check shortly after start and whenever the app comes back
+    // to the foreground (GitHub Releases, at most every 30 min).
     Future<void>.delayed(const Duration(seconds: 3), () {
       if (mounted) checkForUpdate(context, automatic: true);
     });
+    _lifecycle = AppLifecycleListener(
+      onResume: () {
+        if (mounted && !_playerOpen) checkForUpdate(context, automatic: true);
+      },
+    );
     Updater.currentVersion().then((v) => mounted ? setState(() => _version = v) : null);
     if (_canCast) _initTv();
   }
@@ -264,13 +271,12 @@ class _BrowserScreenState extends State<BrowserScreen> {
     try {
       await w.open();
       _loaded = true;
-      // the web window is the app's face; the player window waits in the taskbar
-      // the app window is shown after its first frame; minimizing earlier is undone
-      for (var i = 0; i < 50 && !await windowManager.isVisible(); i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-      }
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-      await windowManager.minimize();
+      FullscreenHelper.escapeClosesPlayer = true;
+      // the web window is the app's face; the player window comes back for playback
+      // main() shows the app window after its first frame; hiding earlier is undone
+      await appWindowShown.future.timeout(const Duration(seconds: 10), onTimeout: () {});
+      // hidden, not minimized: one window (the web one) in the taskbar while browsing
+      await windowManager.hide();
     } catch (e, st) {
       appLog('web window failed: $e\n$st');
       if (mounted) setState(() => _loadError = 'Không mở được cửa sổ web: $e');
@@ -492,6 +498,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
   @override
   void dispose() {
+    _lifecycle?.dispose();
     _window?.isOpen.removeListener(_onWindowOpenChanged);
     _window?.close();
     _toPlayer.close();
@@ -512,6 +519,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
       final tv = _tvSession;
       if (!_playerOpen && tv != null && tv.running && (type == 'subs' || type == 'subText' || type == 'subSearch')) {
         tv.client.page(raw!).catchError((Object e) => appLog('tv page relay: $e'));
+        return {'ok': true};
+      }
+      if (type == 'menu') {
+        _openMenuFromPage();
         return {'ok': true};
       }
       switch (type) {
@@ -545,6 +556,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
       try {
         await windowManager.show();
         await windowManager.focus();
+        // play over everything instead of a second small window on top of the web window
+        await FullscreenHelper.set(true);
       } catch (e) {
         appLog('focus player window: $e');
       }
@@ -572,7 +585,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
     // back to the web window
     if (_external && _window!.isOpen.value) {
       try {
-        await windowManager.minimize();
+        // PlayerScreen already left fullscreen
+        await windowManager.hide();
       } catch (_) {}
     }
   }
@@ -611,6 +625,18 @@ class _BrowserScreenState extends State<BrowserScreen> {
     } else if (mounted) {
       await _showAppMenu();
     }
+  }
+
+  /// "📱 Ứng dụng" in the page's account menu: phones have no toolbar, and
+  /// in the Windows web window the app window is hidden.
+  Future<void> _openMenuFromPage() async {
+    if (_external) {
+      try {
+        await windowManager.show();
+        await windowManager.focus();
+      } catch (_) {}
+    }
+    if (mounted) await _showAppMenu();
   }
 
   Future<void> _showAppMenu() async {
