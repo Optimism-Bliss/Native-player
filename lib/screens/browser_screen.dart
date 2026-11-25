@@ -248,7 +248,21 @@ class _BrowserScreenState extends State<BrowserScreen> {
   }
 
   /// Where to play: this device or the paired TV.
-  Future<void> _chooseTarget(PlayRequest request, Object raw) async {
+  /// Single Windows window: Flutter UI (sheets, dialogs) is drawn under the page, so the page
+  /// steps aside while it is open.
+  Future<T> _overPage<T>(Future<T> Function() show) async {
+    if (!WebWindowNative.embedded) return show();
+    WebWindowNative.hidePage();
+    try {
+      return await show();
+    } finally {
+      if (!_playerOpen && (_window?.isOpen.value ?? false)) WebWindowNative.showPage();
+    }
+  }
+
+  Future<void> _chooseTarget(PlayRequest request, Object raw) => _overPage(() => _chooseTargetNow(request, raw));
+
+  Future<void> _chooseTargetNow(PlayRequest request, Object raw) async {
     final tv = _tv!;
     final where = await showModalBottomSheet<String>(
       context: context,
@@ -352,8 +366,19 @@ class _BrowserScreenState extends State<BrowserScreen> {
       // the web window is the app's face; the player window comes back for playback
       // main() shows the app window after its first frame; hiding earlier is undone
       await appWindowShown.future.timeout(const Duration(seconds: 10), onTimeout: () {});
-      // hidden, not minimized: one window (the web one) in the taskbar while browsing
-      await windowManager.hide();
+      final single = await WebWindowNative.embed();
+      // two windows: the player is a full-screen layer over the web window (Esc closes it);
+      // one window: a normal desktop player (Esc leaves full screen first, the window stays)
+      FullscreenHelper.escapeClosesPlayer = !single;
+      if (single) {
+        // one window: the page fills the app window, the player replaces it while a film plays
+        await windowManager.show();
+        await windowManager.maximize();
+        await windowManager.focus();
+      } else {
+        // two-window fallback: hidden, not minimized, one window (the web one) in the taskbar
+        await windowManager.hide();
+      }
     } catch (e, st) {
       appLog('web window failed: $e\n$st');
       if (mounted) setState(() => _loadError = 'Không mở được cửa sổ web: $e');
@@ -684,6 +709,18 @@ class _BrowserScreenState extends State<BrowserScreen> {
   /// let a hidden window simply take the foreground, so it stays above the web
   /// window (always on top) while the player is open, in full screen.
   Future<void> _raisePlayerWindow() async {
+    if (WebWindowNative.embedded) {
+      // single window: the page steps aside, the player fills the same window
+      WebWindowNative.hidePage();
+      try {
+        await windowManager.show();
+        await windowManager.focus();
+        await FullscreenHelper.set(true);
+      } catch (e) {
+        appLog('player in app window: $e');
+      }
+      return;
+    }
     // the web window steps aside (minimized) so nothing can cover the player
     WebWindowNative.minimize();
     try {
@@ -742,7 +779,13 @@ class _BrowserScreenState extends State<BrowserScreen> {
       ),
     );
     _playerOpen = false;
-    if (_external) {
+    if (_external && WebWindowNative.embedded) {
+      if (_window!.isOpen.value) {
+        WebWindowNative.showPage();
+      } else {
+        await _quitDesktop();
+      }
+    } else if (_external) {
       try {
         await windowManager.setAlwaysOnTop(false);
         // back to the web window (PlayerScreen already left fullscreen)
@@ -800,6 +843,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
   /// "📱 Ứng dụng" in the page's account menu: phones have no toolbar, and
   /// in the Windows web window the app window is hidden.
   Future<void> _openMenuFromPage() async {
+    if (WebWindowNative.embedded) {
+      await _overPage(_showAppMenu);
+      return;
+    }
     if (_external) {
       try {
         await windowManager.show();
