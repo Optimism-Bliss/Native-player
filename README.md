@@ -72,6 +72,7 @@ Thông tin bàn giao, kết quả kiểm thử và các việc làm sau nằm tr
 
 - [media_kit](https://github.com/media-kit/media-kit) / [DonutWare fork](https://github.com/DonutWare/media-kit): MIT. libmpv/FFmpeg đi kèm theo giấy phép LGPL/GPL của bản build tương ứng.
 - [webview_all](https://pub.dev/packages/webview_all): MIT.
+- [desktop_webview_window](https://pub.dev/packages/desktop_webview_window): Apache-2.0 (cửa sổ web riêng trên Windows).
 - [qr_flutter](https://pub.dev/packages/qr_flutter): BSD-3-Clause (mã QR trên TV).
 - Phông Rubik (SIL OFL 1.1) và Droid Sans Fallback (Apache 2.0), lấy từ asset của Fladder.
 - Giao diện player tham khảo bố cục của Fladder (GPLv3).

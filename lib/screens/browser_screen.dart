@@ -9,6 +9,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_all/webview_all.dart';
 import 'package:webview_all_android/webview_all_android.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../bridge.dart';
 import '../player/playback_controller.dart';
@@ -23,6 +24,7 @@ import '../update/update_ui.dart';
 import '../update/updater.dart';
 import '../util/log.dart';
 import 'connect_screen.dart';
+import 'web_window.dart';
 
 /// The TorBox STRM web UI inside a WebView. The page itself handles login
 /// (session cookie), browsing and search; "▶" buttons call back into the app
@@ -48,6 +50,10 @@ class _BrowserScreenState extends State<BrowserScreen> {
   String _version = '';
   bool _loaded = false;
 
+  /// Windows: the web UI runs in its own native window (see web_window.dart).
+  WebWindow? _window;
+  bool get _external => _window != null;
+
   /// "Play on TV": the paired TV and the playback running on it (phones / desktop only).
   PairedTv? _tv;
   TvSession? _tvSession;
@@ -64,7 +70,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
   @override
   void initState() {
     super.initState();
-    _setup();
+    _start();
     // Quiet update check shortly after start (GitHub Releases, at most every 6 h).
     Future<void>.delayed(const Duration(seconds: 3), () {
       if (mounted) checkForUpdate(context, automatic: true);
@@ -237,6 +243,52 @@ class _BrowserScreenState extends State<BrowserScreen> {
         builder: (_) => TvRemoteScreen(session: session, tvName: tv.name),
       ),
     );
+  }
+
+  Future<void> _start() async {
+    if (isDesktop && await WebWindow.enabled()) {
+      await _openWindow();
+    } else {
+      await _setup();
+    }
+  }
+
+  Future<void> _openWindow() async {
+    var w = _window;
+    if (w == null) {
+      w = _window = WebWindow(server: widget.server, onCall: _onBridgeCall)
+        ..onExternal = (uri) => launchUrl(uri, mode: LaunchMode.externalApplication);
+      w.isOpen.addListener(_onWindowOpenChanged);
+    }
+    if (mounted) setState(() => _loadError = null);
+    try {
+      await w.open();
+      _loaded = true;
+      // the web window is the app's face; the player window waits in the taskbar
+      // the app window is shown after its first frame; minimizing earlier is undone
+      for (var i = 0; i < 50 && !await windowManager.isVisible(); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await windowManager.minimize();
+    } catch (e, st) {
+      appLog('web window failed: $e\n$st');
+      if (mounted) setState(() => _loadError = 'Không mở được cửa sổ web: $e');
+    }
+  }
+
+  /// Web window closed: show the app window (menu, reopen, update, log).
+  void _onWindowOpenChanged() {
+    if (_window?.isOpen.value == false) {
+      windowManager.show().then((_) => windowManager.focus()).catchError((_) {});
+    }
+  }
+
+  Future<void> _reload() async => _external ? _window!.reload() : _web.reload();
+  Future<void> _home() async => _external ? _window!.home() : _web.loadRequest(widget.server);
+  Future<void> _goBack() async {
+    if (_external) return _window!.back();
+    if (await _web.canGoBack()) await _web.goBack();
   }
 
   /// Each step is independent: one unsupported call on a platform must not
@@ -439,6 +491,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
   @override
   void dispose() {
+    _window?.isOpen.removeListener(_onWindowOpenChanged);
+    _window?.close();
     _toPlayer.close();
     super.dispose();
   }
@@ -485,6 +539,16 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
   Future<void> _openPlayer(PlayRequest request) async {
     _playerOpen = true;
+    // web UI in its own window: bring the player's window to the front
+    if (_external) {
+      try {
+        await windowManager.show();
+        await windowManager.focus();
+      } catch (e) {
+        appLog('focus player window: $e');
+      }
+      if (!mounted) return;
+    }
     await Navigator.of(context).push(
       PageRouteBuilder<void>(
         opaque: true,
@@ -504,9 +568,16 @@ class _BrowserScreenState extends State<BrowserScreen> {
       ),
     );
     _playerOpen = false;
+    // back to the web window
+    if (_external && _window!.isOpen.value) {
+      try {
+        await windowManager.minimize();
+      } catch (_) {}
+    }
   }
 
   Future<void> _sendEvent(Map<String, Object?> event) async {
+    if (_external) return _window!.send(event);
     try {
       await _web.runJavaScript('window.TorBoxStrmBridge&&window.TorBoxStrmBridge.event(${jsonEncode(event)})');
     } catch (e) {
@@ -521,6 +592,11 @@ class _BrowserScreenState extends State<BrowserScreen> {
   }
 
   Future<void> _signOut() async {
+    if (_external) {
+      if (!_window!.isOpen.value) await _window!.open();
+      // the server clears its session cookie and shows the login page
+      return _window!.go('logout');
+    }
     await WebViewCookieManager().clearCookies();
     await _web.clearLocalStorage();
     await _web.loadRequest(widget.server);
@@ -565,9 +641,9 @@ class _BrowserScreenState extends State<BrowserScreen> {
     );
     switch (choice) {
       case 'reload':
-        await _web.reload();
+        await _reload();
       case 'home':
-        await _web.loadRequest(widget.server);
+        await _home();
       case 'server':
         await _changeServer();
       case 'signout':
@@ -634,8 +710,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
               Expanded(
                 child: Stack(
                   children: [
-                    WebViewWidget(controller: _web),
-                    if (_progress < 100)
+                    if (_external) _windowPanel(context) else WebViewWidget(controller: _web),
+                    if (!_external && _progress < 100)
                       Positioned(
                         top: 0,
                         left: 0,
@@ -664,7 +740,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
                                   spacing: 8,
                                   children: [
                                     FilledButton.icon(
-                                      onPressed: () => _web.reload(),
+                                      onPressed: _external ? _openWindow : () => _web.reload(),
                                       icon: const Icon(IconsaxPlusLinear.refresh),
                                       label: const Text('Thử lại'),
                                     ),
@@ -687,6 +763,39 @@ class _BrowserScreenState extends State<BrowserScreen> {
     );
   }
 
+  /// Main window while the web UI is in its own window.
+  Widget _windowPanel(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return ValueListenableBuilder<bool>(
+      valueListenable: _window!.isOpen,
+      builder: (context, open, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(IconsaxPlusLinear.global, size: 48, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(height: 16),
+              Text(open ? 'Trang web đang mở ở cửa sổ riêng' : 'Cửa sổ web đã đóng', style: text.titleLarge),
+              const SizedBox(height: 8),
+              Text(
+                'Duyệt phim trong cửa sổ đó. Bấm ▶ trên phim thì trình phát mở ở cửa sổ này.',
+                style: text.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: _openWindow,
+                icon: const Icon(IconsaxPlusLinear.export_3),
+                label: Text(open ? 'Về trang chủ' : 'Mở lại cửa sổ web'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _toolbar(BuildContext context) {
     return SizedBox(
       height: 40,
@@ -695,23 +804,11 @@ class _BrowserScreenState extends State<BrowserScreen> {
           IconButton(
             tooltip: 'Quay lại',
             iconSize: 20,
-            onPressed: () async {
-              if (await _web.canGoBack()) _web.goBack();
-            },
+            onPressed: _goBack,
             icon: const Icon(IconsaxPlusLinear.arrow_left_1),
           ),
-          IconButton(
-            tooltip: 'Trang chủ',
-            iconSize: 20,
-            onPressed: () => _web.loadRequest(widget.server),
-            icon: const Icon(IconsaxPlusLinear.home_2),
-          ),
-          IconButton(
-            tooltip: 'Tải lại',
-            iconSize: 20,
-            onPressed: () => _web.reload(),
-            icon: const Icon(IconsaxPlusLinear.refresh),
-          ),
+          IconButton(tooltip: 'Trang chủ', iconSize: 20, onPressed: _home, icon: const Icon(IconsaxPlusLinear.home_2)),
+          IconButton(tooltip: 'Tải lại', iconSize: 20, onPressed: _reload, icon: const Icon(IconsaxPlusLinear.refresh)),
           const SizedBox(width: 8),
           Icon(widget.server.scheme == 'https' ? IconsaxPlusLinear.lock_1 : IconsaxPlusLinear.unlock, size: 16),
           const SizedBox(width: 6),
@@ -730,6 +827,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
               'server' => _changeServer(),
               'update' => checkForUpdate(context),
               'log' => _showLog(),
+              'web-window' => WebWindow.setEnabled(!_external).then((_) => _snack('Đã lưu — mở lại app để áp dụng')),
               _ => _onTvMenu(v),
             },
             itemBuilder: (_) => [
@@ -765,6 +863,15 @@ class _BrowserScreenState extends State<BrowserScreen> {
                 const PopupMenuItem(
                   value: 'tv-forget',
                   child: ListTile(leading: Icon(IconsaxPlusLinear.monitor_mobbile), title: Text('Ngắt kết nối TV')),
+                ),
+              if (Platform.isWindows)
+                PopupMenuItem(
+                  value: 'web-window',
+                  child: ListTile(
+                    leading: const Icon(IconsaxPlusLinear.export_3),
+                    title: Text(_external ? 'Hiện web trong cửa sổ app' : 'Mở web ở cửa sổ riêng'),
+                    subtitle: const Text('Áp dụng khi mở lại app'),
+                  ),
                 ),
               const PopupMenuItem(
                 value: 'log',
