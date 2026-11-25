@@ -29,7 +29,14 @@ class TvHome extends StatefulWidget {
 }
 
 class _TvHomeState extends State<TvHome> {
-  late final TvReceiver _rx = TvReceiver(openPlayer: _openPlayer, name: 'TorBox STRM TV', onServer: _setServer);
+  late final TvReceiver _rx = TvReceiver(
+    openPlayer: _openPlayer,
+    name: 'TorBox STRM TV',
+    onServer: _setServer,
+    onHome: () {
+      if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+    },
+  );
   late Uri? _server = widget.server;
 
   Future<void> _setServer(Uri server, String code) async {

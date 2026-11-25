@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -135,6 +136,8 @@ class _TvRemoteScreenState extends State<TvRemoteScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Text('TV không phát gì.', style: text.titleMedium, textAlign: TextAlign.center),
                   ),
+                _RemotePad(onKey: (k) => _cmd('key', {'key': k})),
+                const SizedBox(height: 16),
                 if (st.input != null) _TvKeyboard(session: s, field: st.input!),
                 if (!st.active && st.input == null)
                   Padding(
@@ -357,4 +360,132 @@ class _TvKeyboardState extends State<_TvKeyboard> {
       ),
     );
   }
+}
+
+/// The TV remote on the phone: arrows, OK, Back, Home and play/pause. Each key
+/// reaches the TV app like its own remote's (start screen, web page, player,
+/// dialogs). Holding an arrow repeats it, to scroll long lists.
+class _RemotePad extends StatelessWidget {
+  const _RemotePad({required this.onKey});
+  final void Function(String key) onKey;
+
+  void _press(String key) {
+    HapticFeedback.selectionClick();
+    onKey(key);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    Widget arrow(String key, IconData icon, String tip) =>
+        _RepeatButton(onPress: () => _press(key), icon: icon, tooltip: tip);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
+        child: Column(
+          children: [
+            SizedBox(
+              width: 228,
+              height: 228,
+              child: DecoratedBox(
+                decoration: BoxDecoration(shape: BoxShape.circle, color: scheme.surfaceContainerHighest),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Align(alignment: Alignment.topCenter, child: arrow('up', IconsaxPlusBold.arrow_up_2, 'Lên')),
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: arrow('down', IconsaxPlusBold.arrow_down_1, 'Xuống'),
+                    ),
+                    Align(alignment: Alignment.centerLeft, child: arrow('left', IconsaxPlusBold.arrow_left_2, 'Trái')),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: arrow('right', IconsaxPlusBold.arrow_right_3, 'Phải'),
+                    ),
+                    SizedBox(
+                      width: 92,
+                      height: 92,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(shape: const CircleBorder(), padding: EdgeInsets.zero),
+                        onPressed: () => _press('ok'),
+                        child: const Text('OK', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                IconButton.filledTonal(
+                  onPressed: () => _press('back'),
+                  icon: const Icon(IconsaxPlusLinear.arrow_left),
+                  tooltip: 'Quay lại',
+                ),
+                IconButton.filledTonal(
+                  onPressed: () => _press('home'),
+                  icon: const Icon(IconsaxPlusLinear.home_2),
+                  tooltip: 'Màn hình chính TV',
+                ),
+                IconButton.filledTonal(
+                  onPressed: () => _press('playpause'),
+                  icon: const Icon(IconsaxPlusLinear.play_circle),
+                  tooltip: 'Phát / tạm dừng',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Arrow key: tap sends once, holding repeats every 150 ms.
+class _RepeatButton extends StatefulWidget {
+  const _RepeatButton({required this.onPress, required this.icon, required this.tooltip});
+  final VoidCallback onPress;
+  final IconData icon;
+  final String tooltip;
+
+  @override
+  State<_RepeatButton> createState() => _RepeatButtonState();
+}
+
+class _RepeatButtonState extends State<_RepeatButton> {
+  Timer? _repeat;
+
+  void _stop() {
+    _repeat?.cancel();
+    _repeat = null;
+  }
+
+  @override
+  void dispose() {
+    _stop();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onLongPressStart: (_) {
+      widget.onPress();
+      _repeat = Timer.periodic(const Duration(milliseconds: 150), (_) => widget.onPress());
+    },
+    onLongPressEnd: (_) => _stop(),
+    onLongPressCancel: _stop,
+    // no tooltip: its own long press would fight the repeat gesture
+    child: Semantics(
+      label: widget.tooltip,
+      button: true,
+      child: IconButton(
+        onPressed: widget.onPress,
+        iconSize: 34,
+        padding: const EdgeInsets.all(14),
+        icon: Icon(widget.icon),
+      ),
+    ),
+  );
 }

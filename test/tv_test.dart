@@ -40,12 +40,14 @@ void main() {
     late TvReceiver rx;
     final played = <PlayRequest>[];
     final servers = <Uri>[];
+    var homes = 0;
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
       rx = TvReceiver(
         openPlayer: (r) async => played.add(r),
         name: 'Test TV',
         onServer: (u, code) async => servers.add(u),
+        onHome: () => homes++,
       );
       await rx.start();
     });
@@ -123,6 +125,12 @@ void main() {
 
       // commands need an open player
       await expectLater(c.command('toggle'), throwsA(isA<TvError>()));
+
+      // the phone remote works without a player: Home goes back to the TV start screen,
+      // other keys are pressed through Android (not available on this test host)
+      await c.command('key', {'key': 'home'});
+      expect(homes, 1);
+      await expectLater(c.command('key', {'key': 'up'}), throwsA(isA<TvError>()));
       c.close();
     });
   });

@@ -816,7 +816,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
     if (_tv != null)
       ListTile(
         leading: const Icon(IconsaxPlusLinear.monitor_recorder),
-        title: Text('Điều khiển / gõ chữ trên ${_tv?.name ?? 'TV'}'),
+        title: Text('Remote ${_tv?.name ?? 'TV'} (điều khiển, gõ chữ)'),
         onTap: () => Navigator.pop(context, 'tv-remote'),
       ),
     ListTile(
