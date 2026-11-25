@@ -1,3 +1,7 @@
+**Có gì mới trong 2.1.1**
+- **Cài đặt trình phát** (học theo Fladder): menu app → "Cài đặt trình phát", nút ⚙ khi đang xem, hoặc nút trên màn hình chính TV. Gồm: tự phát tập kế, bước tua lùi / tới (5–60 giây), bộ đệm, ngôn ngữ âm thanh / phụ đề ưu tiên, kiểu chữ phụ đề, cử chỉ chạm đúp / vuốt, PiP, tuỳ chọn TV (Media3 / mpv, tunneling, khớp tần số, tương thích) và bảng phím tắt.
+- **TV: đổi chế độ giải mã không cần mở lại app** — áp dụng từ phim tiếp theo.
+
 **Có gì mới trong 2.1.0** (bản lớn trình phát, học theo Fladder; gồm cả 2.0.5 chưa phát hành)
 - **TV: trình phát mới Media3** (như Fladder trên Android TV): hình đi thẳng từ chip giải mã ra màn hình, không qua GPU — mượt hơn hẳn trên box yếu (Mi Box S). Âm thanh DTS / TrueHD box không tự giải mã được thì dùng FFmpeg; phụ đề ASS vẽ bằng libass; phụ đề từ server vẫn tự bật như trước. Remote: ◀ ▶ tua 10 giây (giữ: 30 giây), OK / ▲ ▼ hiện thanh điều khiển, Back ẩn thanh rồi thoát. Màn hình chính TV có nút **"Trình phát: Media3 / mpv"** để quay về mpv nếu phim nào không phát được, và **"Tunneling"** (thử khi vẫn giật).
 - **TV: khớp tần số màn hình** chờ TV chuyển chế độ xong mới phát tiếp, và trả lại tần số cũ trước khi đóng trình phát (tránh màn đen ở loa / amply HDMI).
