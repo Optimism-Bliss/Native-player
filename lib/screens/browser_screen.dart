@@ -808,15 +808,33 @@ class _BrowserScreenState extends State<BrowserScreen> {
     await _web.loadRequest(widget.server);
   }
 
-  /// Android: Back walks the page history; on the first page it opens the
-  /// app menu (reload, change server, sign out, quit) instead of leaving.
+  /// Android: Back walks the page history. On the first page it goes back to the screen that
+  /// opened the browser (TV start screen), or leaves the app on a second press within 2 s, like
+  /// most apps. (It used to open the app menu, which the back swipe kept opening by accident;
+  /// the menu stays in the page's account menu.)
   Future<void> _onBack() async {
     if (await _web.canGoBack()) {
       await _web.goBack();
-    } else if (mounted) {
-      await _showAppMenu();
+      return;
     }
+    if (!mounted) return;
+    final nav = Navigator.of(context);
+    if (nav.canPop()) {
+      nav.pop();
+      return;
+    }
+    final now = DateTime.now();
+    if (_backAt != null && now.difference(_backAt!) < const Duration(seconds: 2)) {
+      await SystemNavigatorPop.pop();
+      return;
+    }
+    _backAt = now;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('Bấm Back lần nữa để thoát'), duration: Duration(seconds: 2)));
   }
+
+  DateTime? _backAt;
 
   /// "📱 Ứng dụng" in the page's account menu: phones have no toolbar, and
   /// in the Windows web window the app window is hidden.
