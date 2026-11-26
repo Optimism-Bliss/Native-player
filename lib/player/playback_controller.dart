@@ -4,6 +4,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../bridge.dart';
@@ -124,6 +125,16 @@ class PlayerHost {
     });
     final native = player.platform;
     if (native is NativePlayer && fontsDir != null) await native.setProperty('sub-fonts-dir', fontsDir);
+    if (native is NativePlayer) {
+      // mpv's disk cache ("Failed to create file cache" on Android and Windows): a folder the app may write to
+      try {
+        final cacheDir = Directory('${(await getTemporaryDirectory()).path}${Platform.pathSeparator}mpv-cache');
+        await cacheDir.create(recursive: true);
+        await native.setProperty('cache-dir', cacheDir.path);
+      } catch (e) {
+        appLog('player: cache dir: $e');
+      }
+    }
     if (native is NativePlayer) {
       // Same network/cache tuning Fladder uses for direct HTTP playback.
       await native.setProperty('force-seekable', 'yes');
