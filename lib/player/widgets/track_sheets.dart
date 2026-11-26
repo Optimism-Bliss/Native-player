@@ -273,6 +273,7 @@ class _SubtitleSheetState extends State<_SubtitleSheet> {
                 ),
             const Divider(height: 12),
             _SubtitleTuning(player: player),
+            _SubtitleExtras(c: c, tracks: embedded),
           ],
         );
       },
@@ -595,4 +596,73 @@ Future<void> showPlaybackInfo(BuildContext context, Player player, ActiveTracks 
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Đóng'))],
     ),
   );
+}
+
+
+/// Manual subtitle height and the bilingual (second line) track.
+class _SubtitleExtras extends StatelessWidget {
+  const _SubtitleExtras({required this.c, required this.tracks});
+  final PlaybackController c;
+  final List<SubtitleTrack> tracks;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    const compact = VisualDensity.compact;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      child: Wrap(
+        spacing: 24,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          ValueListenableBuilder<int>(
+            valueListenable: PlaybackController.subOffset,
+            builder: (context, off, _) => Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Vị trí', style: text.bodyMedium),
+                const SizedBox(width: 8),
+                IconButton.filledTonal(
+                  visualDensity: compact,
+                  iconSize: 18,
+                  tooltip: 'Hạ xuống (Shift+R)',
+                  onPressed: () => c.moveSubtitles(-2),
+                  icon: const Icon(IconsaxPlusLinear.arrow_down_1),
+                ),
+                SizedBox(width: 48, child: Text('${off >= 0 ? '+' : ''}$off', textAlign: TextAlign.center)),
+                IconButton.filledTonal(
+                  visualDensity: compact,
+                  iconSize: 18,
+                  tooltip: 'Nâng lên (R)',
+                  onPressed: () => c.moveSubtitles(2),
+                  icon: const Icon(IconsaxPlusLinear.arrow_up_2),
+                ),
+              ],
+            ),
+          ),
+          if (tracks.isNotEmpty)
+            ValueListenableBuilder<String>(
+              valueListenable: c.secondarySubtitle,
+              builder: (context, sec, _) => Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Song ngữ', style: text.bodyMedium),
+                  const SizedBox(width: 8),
+                  DropdownButton<String>(
+                    value: tracks.any((t) => t.id == sec) ? sec : 'no',
+                    isDense: true,
+                    onChanged: (v) => c.setSecondarySubtitle(v ?? 'no'),
+                    items: [
+                      const DropdownMenuItem(value: 'no', child: Text('Tắt')),
+                      for (final t in tracks) DropdownMenuItem(value: t.id, child: Text(subtitleTrackLabel(t))),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }

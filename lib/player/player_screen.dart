@@ -92,7 +92,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// Forced aspect ratios are not available there and fall back to "fit".
   void _applyFit() {
     final p = c.player.platform;
-    if (p is! Media3Player) return;
+    // mpv: forced ratios are applied by mpv itself (video-aspect-override). The picture size then
+    // changes at the source, so the widget only has to fit it.
+    if (p is! Media3Player) {
+      c.setAspectOverride(_fitMode.aspectRatio);
+      return;
+    }
     p.setFit(switch (_fitMode) {
       VideoFit.cover => 'zoom',
       VideoFit.fill => 'fill',
@@ -530,6 +535,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
       // 0-9: jump to 0 %, 10 % … 90 % of the film
       final d = c.player.state.duration;
       if (d > Duration.zero) act(() => c.player.seek(d * (_digit(key)! / 10)));
+    } else if (key == LogicalKeyboardKey.keyR) {
+      c.moveSubtitles(HardwareKeyboard.instance.isShiftPressed ? -2 : 2);
     } else if (key == LogicalKeyboardKey.keyN && !repeat) {
       if (c.hasNext) act(c.next);
     } else if (key == LogicalKeyboardKey.keyP && !repeat) {
@@ -696,7 +703,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
               controls: NoVideoControls,
               fill: Colors.black,
               fit: _fit.boxFit,
-              aspectRatio: _fit.aspectRatio,
               // libass renders every subtitle format inside mpv (styled ASS included).
               subtitleViewConfiguration: const SubtitleViewConfiguration(visible: false),
             )

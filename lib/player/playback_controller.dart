@@ -10,9 +10,9 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../bridge.dart';
 import '../util/tv_mode.dart';
 import 'media3_player.dart';
+import 'subtitle_style.dart';
 import 'player_settings.dart';
 import 'subtitle_fonts.dart';
-import 'subtitle_style.dart';
 import 'tv_playback_prefs.dart';
 import '../util/log.dart';
 import '../util/format.dart';
@@ -689,8 +689,43 @@ class PlaybackController {
     // sub-pos: 100 = bottom edge of the frame. Keep the line inside the
     // visible part, and above the controls while they are shown.
     final visibleBottom = 100 * (1 - _hiddenBottom) - (_hiddenBottom > 0 ? 3 : 0);
-    final pos = (_subtitlesRaised ? visibleBottom - 22 : visibleBottom).clamp(0, 100).round();
+    final pos = ((_subtitlesRaised ? visibleBottom - 22 : visibleBottom) - subOffset.value).clamp(0, 100).round();
     await native.setProperty('sub-pos', '$pos');
+    // Second (bilingual) line sits just above the main one.
+    try {
+      await native.setProperty('secondary-sub-pos', '${(pos - 9 * SubtitleStyle.current.scale).clamp(0, 100).round()}');
+    } catch (_) {} // older libmpv: no secondary-sub-pos, mpv puts the second line at the top
+  }
+
+  /// Manual subtitle height, in % of the frame (positive = higher). Shared by every player
+  /// in this run, so it survives episode changes.
+  static final ValueNotifier<int> subOffset = ValueNotifier(0);
+
+  Future<void> moveSubtitles(int delta) async {
+    subOffset.value = (subOffset.value + delta).clamp(-10, 80);
+    await _applySubtitlePosition();
+    _say('Vị trí phụ đề: ${subOffset.value >= 0 ? '+' : ''}${subOffset.value}');
+  }
+
+  /// Bilingual mode: second subtitle track (mpv secondary-sid), drawn above the main one.
+  final ValueNotifier<String> secondarySubtitle = ValueNotifier('no');
+
+  Future<void> setSecondarySubtitle(String id) async {
+    final native = player.platform;
+    if (native is! NativePlayer || _disposed) {
+      return _say('Phụ đề song ngữ cần trình phát mpv');
+    }
+    await native.setProperty('secondary-sid', id);
+    await native.setProperty('secondary-sub-visibility', 'yes');
+    secondarySubtitle.value = id;
+    await _applySubtitlePosition();
+  }
+
+  /// Forced aspect ratio inside mpv (works whatever draws the picture); null = file's own.
+  Future<void> setAspectOverride(double? ratio) async {
+    final native = player.platform;
+    if (native is! NativePlayer || _disposed) return;
+    await native.setProperty('video-aspect-override', ratio == null ? 'no' : ratio.toStringAsFixed(4));
   }
 
   /// Chapters of the current file (MKV / MP4 chapter list); 0 or 1 hides the chapter buttons.
