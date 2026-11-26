@@ -80,7 +80,7 @@ class _TvHomeState extends State<TvHome> {
   void dispose() {
     _lifecycle?.dispose();
     _addressTimer?.cancel();
-    await _rx.stop();
+    _rx.stop();
     super.dispose();
   }
 
