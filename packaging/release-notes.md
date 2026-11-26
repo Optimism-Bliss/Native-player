@@ -1,8 +1,10 @@
-**Có gì mới trong 2.2.0 (đang thử)**
-- **TV: trình phát Media3 dùng chung giao diện với điện thoại / PC.** Hình vẫn đi thẳng từ chip giải mã ra màn hình (không qua GPU), giao diện điều khiển của app phủ trong suốt lên trên: cùng thanh tiến trình tua bằng remote, bảng phụ đề / âm thanh, phụ đề server, tìm phụ đề online, **đổi khung hình** (vừa / lấp đầy / kéo giãn), tốc độ, cài đặt, thông tin phát (bộ giải mã, khung hình rơi).
-- **TV: lệnh phát mới luôn mở được phim** (trước đây có lúc TV bỏ qua lệnh khi trình phát cũ chưa đóng hẳn).
-- Media3 chưa có: lệch phụ đề, chương phim (chọn "mpv" trong Cài đặt trình phát nếu cần).
-- App không còn tự mời cập nhật lên bản thử (pre-release).
+**Có gì mới trong 2.2.0**
+- **TV: trình phát Media3 dùng chung giao diện với điện thoại / PC.** Hình đi thẳng từ chip giải mã ra màn hình (không qua GPU), giao diện điều khiển của app phủ lên trên: thanh tiến trình tua bằng remote, bảng phụ đề / âm thanh, phụ đề server, tìm phụ đề online, **đổi khung hình** (vừa / lấp đầy / kéo giãn), tốc độ, cài đặt, thông tin phát. Media3 chưa có lệch phụ đề và chương phim (chọn "mpv" trong Cài đặt trình phát nếu cần).
+- **TV chỉ còn nhận phim từ điện thoại:** bỏ duyệt phim trên TV (khó dùng bằng remote trên box yếu). Chọn phim trên điện thoại rồi bấm "Phát trên TV"; TV không cần đăng nhập.
+- **TV: nút "Đặt lại cấu hình"** (thay "Dùng như điện thoại"): xoá máy chủ, điện thoại đã ghép, vai trò máy và cài đặt, quay về màn hình chọn vai trò.
+- **TV: lệnh phát mới luôn mở được phim** (trước đây có lúc bị bỏ qua khi trình phát cũ chưa đóng hẳn).
+- **Điện thoại: vuốt / bấm Back ở trang đầu không còn mở bảng chọn;** bấm 2 lần để thoát app.
+- App không tự cập nhật lên bản thử (pre-release).
 
 **Có gì mới trong 2.1.1**
 - **Cài đặt trình phát** (học theo Fladder): menu app → "Cài đặt trình phát", nút ⚙ khi đang xem, hoặc nút trên màn hình chính TV. Gồm: tự phát tập kế, bước tua lùi / tới (5–60 giây), bộ đệm, ngôn ngữ âm thanh / phụ đề ưu tiên, kiểu chữ phụ đề, cử chỉ chạm đúp / vuốt, PiP, tuỳ chọn TV (Media3 / mpv, tunneling, khớp tần số, tương thích) và bảng phím tắt.
