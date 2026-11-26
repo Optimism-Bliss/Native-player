@@ -530,7 +530,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     } else if (key == LogicalKeyboardKey.keyP && !repeat) {
       if (c.hasPrevious) act(c.previous);
     } else if (key == LogicalKeyboardKey.escape) {
-      if (FullscreenHelper.isFullscreen.value && isDesktop && !FullscreenHelper.escapeClosesPlayer) {
+      if (isTvDevice && !_overlay) {
+        _showOverlay();
+      } else if (FullscreenHelper.isFullscreen.value && isDesktop && !FullscreenHelper.escapeClosesPlayer) {
         FullscreenHelper.set(false);
       } else {
         _close();
@@ -626,8 +628,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
-        if (isTvDevice && _overlay && c.initialized && c.player.state.playing) {
-          _setOverlay(false);
+        // TV remote: first Back shows the info / controls, a second Back (controls shown) leaves
+        if (isTvDevice && !_overlay && c.initialized) {
+          _showOverlay();
           return;
         }
         _close();

@@ -808,19 +808,26 @@ class _BrowserScreenState extends State<BrowserScreen> {
     await _web.loadRequest(widget.server);
   }
 
-  /// Android Back / back swipe. A detail page, the web player or a dialog open on the page:
-  /// back closes it (they are history entries). Otherwise, on any tab of the main page: the app
-  /// menu (reload, TV remote, server, settings…), instead of stepping back through tab switches.
+  /// Android Back / back swipe:
+  /// * a detail page, the web player or a dialog is open: back closes it;
+  /// * the Home tab ("Trang chủ"): the app menu (reload, TV remote, server, settings…);
+  /// * any other tab (Phim, Shows, Khám phá, a search…): back, like the browser's back
+  ///   (to the Home tab when there is nothing to go back to).
   Future<void> _onBack() async {
-    var overlay = false;
+    var where = 'home';
     try {
       final r = await _web.runJavaScriptReturningResult(
-        '(typeof OVS!=="undefined"&&OVS.length>0)||(typeof topLayer==="function"&&!!topLayer())',
+        '(typeof OVS!=="undefined"&&OVS.length>0)||(typeof topLayer==="function"&&!!topLayer())?"overlay"'
+        ':(typeof S!=="undefined"&&(S.type!=="home"||S.q))?"tab":"home"',
       );
-      overlay = r == true || r.toString() == 'true';
+      where = r.toString().replaceAll('"', '');
     } catch (_) {}
-    if (overlay && await _web.canGoBack()) {
-      await _web.goBack();
+    if (where == 'overlay' || where == 'tab') {
+      if (await _web.canGoBack()) {
+        await _web.goBack();
+      } else if (where == 'tab') {
+        await _home();
+      }
       return;
     }
     if (mounted) await _showAppMenu();
