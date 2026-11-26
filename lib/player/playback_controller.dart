@@ -370,6 +370,9 @@ class PlaybackController {
   DateTime? _waitSince;
   int _waits = 0;
 
+  /// libmpv property (or the Media3 equivalent), '' when unknown. Used by the diagnostics overlay.
+  Future<String> prop(String name) => _prop(name);
+
   Future<String> _prop(String name) async {
     final n = player.platform;
     if (n is Media3Player) return n.getProperty(name);

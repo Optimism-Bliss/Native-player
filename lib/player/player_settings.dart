@@ -28,6 +28,9 @@ class PlayerSettings {
   /// Android phones: Home while playing shrinks the film into a small window.
   static bool autoPip = true;
 
+  /// Diagnostics over the picture (decoder, frames, buffer, speed, memory). Off by default.
+  static bool debugOverlay = false;
+
   static const seekChoices = [5, 10, 15, 30, 60];
   static const bufferChoices = [0, 32, 64, 150, 300, 500];
   static const langChoices = <(String, String)>[
@@ -60,6 +63,7 @@ class PlayerSettings {
     doubleTapSeek = p.getBool('ps_double_tap') ?? true;
     swipeGestures = p.getBool('ps_swipe') ?? true;
     autoPip = p.getBool('ps_auto_pip') ?? true;
+    debugOverlay = p.getBool('ps_debug') ?? false;
   }
 
   static Future<void> save() async {
@@ -73,5 +77,6 @@ class PlayerSettings {
     await p.setBool('ps_double_tap', doubleTapSeek);
     await p.setBool('ps_swipe', swipeGestures);
     await p.setBool('ps_auto_pip', autoPip);
+    await p.setBool('ps_debug', debugOverlay);
   }
 }

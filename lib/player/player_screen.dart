@@ -20,6 +20,7 @@ import 'tv_playback_prefs.dart';
 import 'player_settings.dart';
 import 'player_settings_screen.dart';
 import 'playback_controller.dart';
+import 'widgets/debug_overlay.dart';
 import 'widgets/progress_bar.dart';
 import 'widgets/subtitle_style_sheet.dart';
 import 'widgets/track_sheets.dart';
@@ -511,6 +512,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
       if (!repeat) act(_toggleMute);
     } else if (key == LogicalKeyboardKey.keyF || key == LogicalKeyboardKey.f11) {
       if (!repeat) _toggleFullscreen();
+    } else if (key == LogicalKeyboardKey.keyD && !repeat) {
+      // diagnostics on / off (also in Cài đặt trình phát)
+      setState(() => PlayerSettings.debugOverlay = !PlayerSettings.debugOverlay);
+      PlayerSettings.save();
     } else if (key == LogicalKeyboardKey.keyZ) {
       act(() => c.subtitleDelay(-0.1));
     } else if (key == LogicalKeyboardKey.keyX) {
@@ -698,6 +703,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           else
             const ColoredBox(color: Colors.black),
           if (!Pip.active.value) ...[_gestureLayer(), _centerStatus()],
+          if (PlayerSettings.debugOverlay && !Pip.active.value) DebugOverlay(c: c),
           if (!Pip.active.value)
             IgnorePointer(
               ignoring: !_overlay,
@@ -937,11 +943,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 flex: 2,
                 child: Row(
                   children: [
-                    IconButton(
-                      tooltip: 'Thông tin phát',
-                      onPressed: () => showPlaybackInfo(context, c.player, c.active.value),
-                      icon: const Icon(IconsaxPlusLinear.more),
-                    ),
                     if (wide)
                       IconButton(
                         tooltip: 'Kiểu chữ phụ đề',

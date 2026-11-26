@@ -227,6 +227,15 @@ class _PlayerSettingsScreenState extends State<PlayerSettingsScreen> {
                 icon: IconsaxPlusLinear.cpu_setting,
               ),
           ],
+          _header('Chẩn đoán'),
+          _switch(
+            'Hiện thông tin chẩn đoán',
+            'Góc trên trình phát: trình phát đang dùng, bộ giải mã, khung hình rơi, bộ đệm, tốc độ tải, RAM. '
+                'Dùng khi phim giật / không lên hình; phím tắt D.',
+            PlayerSettings.debugOverlay,
+            (v) => _set(() => PlayerSettings.debugOverlay = v),
+            icon: IconsaxPlusLinear.code,
+          ),
           if (!touch || isTvDevice) ...[_header('Phím tắt'), const _Shortcuts()],
           _header('Giới thiệu'),
           ListTile(
@@ -255,6 +264,7 @@ class _Shortcuts extends StatelessWidget {
     ('Z / X', 'Lệch phụ đề −/+ 100 ms'),
     ('S / V', 'Ẩn / hiện phụ đề'),
     ('0 – 9', 'Nhảy tới 0 % – 90 % phim'),
+    ('D', 'Bật / tắt thông tin chẩn đoán'),
     ('Esc', 'Thoát toàn màn hình / đóng'),
   ];
 
