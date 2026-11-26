@@ -6,6 +6,15 @@ import 'package:ffi/ffi.dart';
 
 import 'log.dart';
 
+final class _MonitorInfo extends Struct {
+  @Uint32()
+  external int cbSize;
+  external _Rect rcMonitor;
+  external _Rect rcWork;
+  @Uint32()
+  external int dwFlags;
+}
+
 final class _Rect extends Struct {
   @Int32()
   external int left;
@@ -57,6 +66,17 @@ class WebWindowNative {
       >('SetWindowPos');
   static final _isWindow = _user32!.lookupFunction<Int32 Function(IntPtr), int Function(int)>('IsWindow');
   static final _setFocus = _user32!.lookupFunction<IntPtr Function(IntPtr), int Function(int)>('SetFocus');
+  static final _dpiForWindow = _user32!.lookupFunction<Uint32 Function(IntPtr), int Function(int)>('GetDpiForWindow');
+  static final _isZoomed = _user32!.lookupFunction<Int32 Function(IntPtr), int Function(int)>('IsZoomed');
+  static final _windowRect = _user32!
+      .lookupFunction<Int32 Function(IntPtr, Pointer<_Rect>), int Function(int, Pointer<_Rect>)>('GetWindowRect');
+  static final _monitorFromWindow = _user32!.lookupFunction<IntPtr Function(IntPtr, Uint32), int Function(int, int)>(
+    'MonitorFromWindow',
+  );
+  static final _monitorInfo = _user32!
+      .lookupFunction<Int32 Function(IntPtr, Pointer<_MonitorInfo>), int Function(int, Pointer<_MonitorInfo>)>(
+        'GetMonitorInfoW',
+      );
 
   static const _swHide = 0;
   static const _swShow = 5;
@@ -155,7 +175,11 @@ class WebWindowNative {
       _w = w;
       _h = h;
       if (w <= 0 || h <= 0) return; // minimized
-      _setPos(_web, 0, 0, 0, w, h, _swpNoZOrder | _swpNoActivate | _swpFrameChanged);
+      // The web window draws its own 40 px title bar (back / reload / min / max / close) at its top; inside the
+      // app window that is a second set of window buttons. Place it above the visible area: the app menu has
+      // reload / home, the page still takes Alt+Left.
+      final bar = (40 * _dpiForWindow(_web) / 96).round();
+      _setPos(_web, 0, 0, -bar, w, h + bar, _swpNoZOrder | _swpNoActivate | _swpFrameChanged);
     } finally {
       calloc.free(r);
     }
@@ -173,6 +197,56 @@ class WebWindowNative {
     fit();
     _showWindow(_web, _swShow);
     _setFocus(_web);
+  }
+
+  // ---------------- full screen (Win32, like Chrome) ----------------
+  // window_manager's setFullScreen leaves the title bar on a maximized window (the app opens maximized).
+
+  static int _savedStyle = 0, _savedEx = 0;
+  static bool _savedZoomed = false;
+  static List<int>? _savedRect;
+  static bool _full = false;
+
+  static int _app() => _main != 0 ? _main : _find('FLUTTER_RUNNER_WIN32_WINDOW');
+
+  static const _wsCaption = 0x00C00000, _wsThickFrame = 0x00040000, _wsMaximize = 0x01000000;
+  static const _exEdges = 0x00000001 | 0x00000100 | 0x00000200 | 0x00020000; // dlgmodal, window, client, static edge
+
+  static bool setFullScreen(bool on) {
+    if (!Platform.isWindows) return false;
+    final h = _app();
+    if (h == 0 || on == _full) return h != 0;
+    if (on) {
+      _savedStyle = _getLong(h, _gwlStyle);
+      _savedEx = _getLong(h, _gwlExStyle);
+      _savedZoomed = _isZoomed(h) != 0;
+      if (_savedZoomed) _showWindow(h, 9); // restore first: a maximized window keeps its frame
+      final r = calloc<_Rect>();
+      final mi = calloc<_MonitorInfo>()..ref.cbSize = sizeOf<_MonitorInfo>();
+      try {
+        _windowRect(h, r);
+        _savedRect = [r.ref.left, r.ref.top, r.ref.right, r.ref.bottom];
+        _setLong(h, _gwlStyle, _savedStyle & ~(_wsCaption | _wsThickFrame | _wsMaximize));
+        _setLong(h, _gwlExStyle, _savedEx & ~_exEdges);
+        _monitorInfo(_monitorFromWindow(h, 2), mi); // MONITOR_DEFAULTTONEAREST
+        final m = mi.ref.rcMonitor;
+        _setPos(h, 0, m.left, m.top, m.right - m.left, m.bottom - m.top, _swpNoZOrder | _swpFrameChanged);
+      } finally {
+        calloc.free(r);
+        calloc.free(mi);
+      }
+    } else {
+      _setLong(h, _gwlStyle, _savedStyle);
+      _setLong(h, _gwlExStyle, _savedEx);
+      final r = _savedRect;
+      if (r != null) {
+        _setPos(h, 0, r[0], r[1], r[2] - r[0], r[3] - r[1], _swpNoZOrder | _swpNoActivate | _swpFrameChanged);
+      }
+      if (_savedZoomed) _showWindow(h, 3); // SW_MAXIMIZE
+    }
+    _full = on;
+    _w = _h = -1;
+    return true;
   }
 
   // Two-window fallback (embedding failed): the web window is minimized while the player plays.

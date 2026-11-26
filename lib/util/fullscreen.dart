@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'win_windows.dart';
+
 /// Completes once main() has shown and focused the desktop window; hiding it
 /// earlier is undone by that first show.
 final Completer<void> appWindowShown = Completer<void>();
@@ -20,7 +22,9 @@ class FullscreenHelper {
   static bool escapeClosesPlayer = false;
 
   static Future<void> set(bool value) async {
-    if (isDesktop) {
+    if (Platform.isWindows && WebWindowNative.setFullScreen(value)) {
+      // own Win32 full screen: window_manager kept the title bar of the (maximized) app window
+    } else if (isDesktop) {
       await windowManager.setFullScreen(value);
     } else {
       await SystemChrome.setEnabledSystemUIMode(value ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge);
