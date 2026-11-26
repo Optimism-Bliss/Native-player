@@ -3,7 +3,8 @@
 - **TV chỉ còn nhận phim từ điện thoại:** bỏ duyệt phim trên TV (khó dùng bằng remote trên box yếu). Chọn phim trên điện thoại rồi bấm "Phát trên TV"; TV không cần đăng nhập.
 - **TV: nút "Đặt lại cấu hình"** (thay "Dùng như điện thoại"): xoá máy chủ, điện thoại đã ghép, vai trò máy và cài đặt, quay về màn hình chọn vai trò.
 - **TV: lệnh phát mới luôn mở được phim** (trước đây có lúc bị bỏ qua khi trình phát cũ chưa đóng hẳn).
-- **Điện thoại: nút Back / vuốt:** đang mở chi tiết phim, trình phát hay hộp thoại thì đóng nó; ở trang chính (tab nào cũng vậy) thì mở bảng chọn, không còn lùi qua các tab đã xem.
+- **Điện thoại: nút Back / vuốt cạnh:** đang mở chi tiết phim, trình phát hay hộp thoại thì đóng nó; ở **Trang chủ** thì hiện bảng chọn; ở các tab khác (Phim, Shows, Khám phá…) thì quay lại.
+- **Trình phát trên TV:** Back lần 1 hiện thanh thông tin / điều khiển, lần 2 thì thoát.
 - App không tự cập nhật lên bản thử (pre-release).
 
 **Có gì mới trong 2.1.1**
