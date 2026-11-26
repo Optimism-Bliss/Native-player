@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../bridge.dart';
 import '../player/playback_controller.dart';
+import '../player/player_settings.dart';
 import '../player/player_settings_screen.dart';
+import '../player/subtitle_style.dart';
 import '../player/player_screen.dart';
 import '../player/tv_playback_prefs.dart';
 import '../screens/role_screen.dart';
@@ -77,7 +80,7 @@ class _TvHomeState extends State<TvHome> {
   void dispose() {
     _lifecycle?.dispose();
     _addressTimer?.cancel();
-    _rx.stop();
+    await _rx.stop();
     super.dispose();
   }
 
@@ -118,6 +121,36 @@ class _TvHomeState extends State<TvHome> {
     } finally {
       _playerOpen = false;
     }
+  }
+
+  /// Back to a fresh install: server, paired phones, device role and every setting are cleared,
+  /// then the role choice (phone / TV) shows again.
+  Future<void> _resetConfig() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(IconsaxPlusLinear.refresh_left_square),
+        title: const Text('Đặt lại cấu hình?'),
+        content: const Text(
+          'Xoá máy chủ, điện thoại đã ghép, vai trò của máy và mọi cài đặt trình phát. '
+          'App quay về màn hình chọn vai trò như lúc mới cài.',
+        ),
+        actions: [
+          TextButton(autofocus: true, onPressed: () => Navigator.pop(context, false), child: const Text('Huỷ')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Đặt lại')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    appLog('tv: reset configuration');
+    await _rx.stop();
+    await (await SharedPreferences.getInstance()).clear();
+    await detectTv();
+    await TvPlaybackPrefs.load();
+    await PlayerSettings.load();
+    await SubtitleStyle.load();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute<void>(builder: (_) => const RoleScreen()), (_) => false);
   }
 
   @override
@@ -177,16 +210,9 @@ class _TvHomeState extends State<TvHome> {
                           runSpacing: 12,
                           children: [
                             OutlinedButton.icon(
-                              onPressed: () async {
-                                await saveRole(tv: false);
-                                if (!context.mounted) return;
-                                Navigator.of(context).pushAndRemoveUntil(
-                                  MaterialPageRoute<void>(builder: (_) => RoleScreen.homeFor(_server)),
-                                  (_) => false,
-                                );
-                              },
-                              icon: const Icon(IconsaxPlusLinear.mobile),
-                              label: const Text('Dùng như điện thoại'),
+                              onPressed: _resetConfig,
+                              icon: const Icon(IconsaxPlusLinear.refresh_left_square),
+                              label: const Text('Đặt lại cấu hình'),
                             ),
                             OutlinedButton.icon(
                               onPressed: () async {
