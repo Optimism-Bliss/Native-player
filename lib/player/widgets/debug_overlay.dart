@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../media3_player.dart';
 import '../playback_controller.dart';
+import '../tv_playback_prefs.dart';
 
 /// Diagnostics on top of the picture (Cài đặt trình phát → Chẩn đoán): backend, decoder, frames,
 /// buffer, download speed and the app's memory, refreshed every second. Off by default.
@@ -49,6 +50,14 @@ class _DebugOverlayState extends State<DebugOverlay> {
       ('Trình phát', media3 ? 'Media3 (ExoPlayer)' : 'mpv (libmpv)'),
       ('Giải mã', [_hw(await p('hwdec-current')), await p('video-codec')].where((x) => x.isNotEmpty).join(' · ')),
       ('Hình', '${s.width ?? '?'}×${s.height ?? '?'}${fps != null ? ' · ${fps.toStringAsFixed(2)} fps' : ''}'),
+      (
+        'Màn hình',
+        [
+          '${TvPlaybackPrefs.displayRefreshRate().toStringAsFixed(0)} Hz',
+          if ((await p('display-fps')).isNotEmpty)
+            'mpv ${double.tryParse(await p('display-fps'))?.toStringAsFixed(1) ?? ''}',
+        ].join(' · '),
+      ),
       ('Rơi khung', '${await p('frame-drop-count')} hiển thị · ${await p('decoder-frame-drop-count')} giải mã'),
       ('Bộ đệm', cache == null ? '—' : '${cache.toStringAsFixed(1)} s${s.buffering ? ' · đang chờ' : ''}'),
       if (speed != null) ('Tải', '${(speed * 8 / 1e6).toStringAsFixed(1)} Mbit/s'),

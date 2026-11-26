@@ -28,6 +28,9 @@ class PlayerSettings {
   /// Android phones: Home while playing shrinks the film into a small window.
   static bool autoPip = true;
 
+  /// Android phones: ask for a screen refresh rate that fits the film (24 fps → 120 Hz) while playing.
+  static bool phoneFrameRate = true;
+
   /// Diagnostics over the picture (decoder, frames, buffer, speed, memory). Off by default.
   static bool debugOverlay = false;
 
@@ -63,6 +66,7 @@ class PlayerSettings {
     doubleTapSeek = p.getBool('ps_double_tap') ?? true;
     swipeGestures = p.getBool('ps_swipe') ?? true;
     autoPip = p.getBool('ps_auto_pip') ?? true;
+    phoneFrameRate = p.getBool('ps_phone_fps') ?? true;
     debugOverlay = p.getBool('ps_debug') ?? false;
   }
 
@@ -77,6 +81,7 @@ class PlayerSettings {
     await p.setBool('ps_double_tap', doubleTapSeek);
     await p.setBool('ps_swipe', swipeGestures);
     await p.setBool('ps_auto_pip', autoPip);
+    await p.setBool('ps_phone_fps', phoneFrameRate);
     await p.setBool('ps_debug', debugOverlay);
   }
 }

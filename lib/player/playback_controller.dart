@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 
@@ -741,7 +742,9 @@ class PlaybackController {
   /// fitting mode and pause while it settles (the screen may go dark for about a second).
   Future<void> _matchFrameRate() async {
     // Media3 switches the display itself (Media3Host.kt), waiting for the TV like Fladder
-    if (!TvPlaybackPrefs.matchFrameRate || _disposed || isMedia3) return;
+    // phones: 120 Hz screens drop to 60 Hz for video on many ROMs; 24 fps on 60 Hz judders (3:2)
+    final phone = Platform.isAndroid && !isTvDevice && PlayerSettings.phoneFrameRate;
+    if (!(TvPlaybackPrefs.matchFrameRate || phone) || _disposed || isMedia3) return;
     final fps = double.tryParse(await _prop('container-fps')) ?? double.tryParse(await _prop('estimated-vf-fps')) ?? 0;
     if (fps < 10 || fps > 121) return;
     final before = TvPlaybackPrefs.displayRefreshRate();
@@ -749,10 +752,12 @@ class PlaybackController {
     appLog(
       'frame rate: film ${fps.toStringAsFixed(3)} fps, display ${before.toStringAsFixed(2)} -> ${hz?.toStringAsFixed(2) ?? 'unchanged'} Hz',
     );
-    if (hz == null || (hz - before).abs() < 0.01 || _disposed) return;
+    if (hz == null || _disposed) return;
     _frameRateChanged = true;
     final n = player.platform;
     if (n is NativePlayer) await n.setProperty('display-fps-override', hz.toStringAsFixed(3));
+    // phone panels switch refresh rate seamlessly; TVs re-sync HDMI (dark for a moment)
+    if (phone || (hz - before).abs() < 0.01) return;
     final wasPlaying = player.state.playing;
     await player.pause();
     await Future<void>.delayed(const Duration(seconds: 2));

@@ -171,6 +171,14 @@ class _PlayerSettingsScreenState extends State<PlayerSettingsScreen> {
               (v) => _set(() => PlayerSettings.swipeGestures = v),
               icon: IconsaxPlusLinear.sun_1,
             ),
+            if (Platform.isAndroid)
+              _switch(
+                'Khớp tần số màn hình',
+                'Màn 90 / 120 Hz: xin tần số hợp với phim (24 fps → 120 Hz) khi phát, tránh giật đều khi máy tự hạ về 60 Hz',
+                PlayerSettings.phoneFrameRate,
+                (v) => _set(() => PlayerSettings.phoneFrameRate = v),
+                icon: IconsaxPlusLinear.monitor,
+              ),
             if (Pip.available)
               _switch(
                 'Hình trong hình (PiP)',

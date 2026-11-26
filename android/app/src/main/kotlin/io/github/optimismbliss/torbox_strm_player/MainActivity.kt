@@ -230,7 +230,7 @@ class MainActivity : FlutterActivity() {
                 n >= 1 && Math.abs(k - n) < 0.005 * n
             }
             .minByOrNull { it.refreshRate } ?: return null
-        if (best.modeId == current.modeId) return best.refreshRate.toDouble()
+        // set even when already in that mode: phones with adaptive refresh drop to 60 Hz for video otherwise
         attrs.preferredDisplayModeId = best.modeId
         window.attributes = attrs
         return best.refreshRate.toDouble()
