@@ -808,33 +808,32 @@ class _BrowserScreenState extends State<BrowserScreen> {
     await _web.loadRequest(widget.server);
   }
 
-  /// Android: Back walks the page history. On the first page it goes back to the screen that
-  /// opened the browser (TV start screen), or leaves the app on a second press within 2 s, like
-  /// most apps. (It used to open the app menu, which the back swipe kept opening by accident;
-  /// the menu stays in the page's account menu.)
+  /// Android Back / back swipe: walks the page history (detail pages and the player are history
+  /// entries too). With nothing to go back to: on the home page it opens the app menu (reload,
+  /// TV remote, server, settings…); on any other page it goes to the home page first.
   Future<void> _onBack() async {
     if (await _web.canGoBack()) {
       await _web.goBack();
       return;
     }
     if (!mounted) return;
-    final nav = Navigator.of(context);
-    if (nav.canPop()) {
-      nav.pop();
-      return;
+    String? url;
+    try {
+      url = await _web.currentUrl();
+    } catch (_) {}
+    final here = url == null ? null : Uri.tryParse(url);
+    final home = widget.server;
+    final atHome =
+        here == null ||
+        (here.origin == home.origin &&
+            (here.path.isEmpty || here.path == '/' || here.path == home.path) &&
+            here.query.isEmpty);
+    if (atHome) {
+      await _showAppMenu();
+    } else {
+      await _home();
     }
-    final now = DateTime.now();
-    if (_backAt != null && now.difference(_backAt!) < const Duration(seconds: 2)) {
-      await SystemNavigatorPop.pop();
-      return;
-    }
-    _backAt = now;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('Bấm Back lần nữa để thoát'), duration: Duration(seconds: 2)));
   }
-
-  DateTime? _backAt;
 
   /// "📱 Ứng dụng" in the page's account menu: phones have no toolbar, and
   /// in the Windows web window the app window is hidden.
