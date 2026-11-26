@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 
 import '../../bridge.dart';
 import '../../util/format.dart';
+import '../media3_player.dart';
 import '../playback_controller.dart';
 import 'subtitle_style_sheet.dart';
 
@@ -510,8 +511,10 @@ class _SubtitleTuningState extends State<_SubtitleTuning> {
 
 Future<void> showPlaybackInfo(BuildContext context, Player player, ActiveTracks active) async {
   final native = player.platform is NativePlayer ? player.platform as NativePlayer : null;
+  final media3 = player.platform is Media3Player ? player.platform as Media3Player : null;
   Future<String> prop(String name) async {
     try {
+      if (media3 != null) return await media3.getProperty(name);
       return await native?.getProperty(name) ?? '';
     } catch (_) {
       return '';

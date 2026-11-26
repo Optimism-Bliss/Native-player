@@ -5,7 +5,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../bridge.dart';
-import '../player/native_tv_player.dart';
 import '../player/playback_controller.dart';
 import '../player/player_settings_screen.dart';
 import '../player/player_screen.dart';
@@ -93,36 +92,6 @@ class _TvHomeState extends State<TvHome> {
     }
     if (!mounted) return;
     _playerOpen = true;
-    if (TvPlaybackPrefs.nativePlayer) {
-      final player = NativeTvPlayer(
-        request: request,
-        page: PageLink(incoming: _rx.pageIn.stream, send: _rx.toPage),
-        onProgress: (key, pos, dur) => _rx.toPage({
-          'type': 'progress',
-          'key': key,
-          'pos': pos.inMilliseconds / 1000,
-          'dur': dur.inMilliseconds / 1000,
-        }),
-      );
-      _rx.remote
-        ..native = player
-        ..close = player.close;
-      try {
-        await player.run();
-      } catch (e) {
-        appLog('tv native player: $e');
-      } finally {
-        if (identical(_rx.remote.native, player)) {
-          _rx.remote
-            ..native = null
-            ..close = null;
-        }
-        _rx.toPage({'type': 'closed', 'key': request.queue[request.index].key});
-        _rx.playerClosed();
-        _playerOpen = false;
-      }
-      return;
-    }
     try {
       await Navigator.of(context).push(
         PageRouteBuilder<void>(

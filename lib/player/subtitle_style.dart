@@ -1,6 +1,8 @@
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'media3_player.dart';
+
 /// How plain subtitles (SRT, VTT, and ASS when overridden) look, kept between sessions.
 /// Applied to libmpv: `sub-scale`, `sub-bold`, `sub-color`, `sub-border-*`, `sub-back-color`.
 class SubtitleStyle {
@@ -60,6 +62,9 @@ class SubtitleStyle {
 
   Future<void> apply(Player player) async {
     final native = player.platform;
+    if (native is Media3Player) {
+      return native.setSubtitleStyle({'scale': scale, 'bold': bold, 'color': color, 'box': box, 'border': border});
+    }
     if (native is! NativePlayer) return;
     for (final (k, v) in [
       ('sub-scale', scale.toStringAsFixed(2)),

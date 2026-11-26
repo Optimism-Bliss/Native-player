@@ -3,7 +3,8 @@ name: Build
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    # v*: releases; dev-*: pre-releases for testing (the app's updater never offers them)
+    tags: ['v*', 'dev-*']
   pull_request:
   workflow_dispatch:
 
@@ -218,6 +219,9 @@ jobs:
           notes="$(sed "s/@ANDROID_SIGNING@/$signed/" packaging/release-notes.md)"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" release-assets/*.apk --clobber
+          elif [[ "$TAG" == dev-* ]]; then
+            gh release create "$TAG" release-assets/*.apk --prerelease --latest=false --verify-tag \
+              --title "TorBox STRM bản thử $TAG" --notes "Bản thử (pre-release), app không tự cập nhật lên bản này. $notes"
           else
             gh release create "$TAG" release-assets/*.apk --latest --verify-tag \
               --title "TorBox STRM $TAG" --notes "$notes"

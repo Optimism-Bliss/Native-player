@@ -78,8 +78,7 @@ class Updater {
 
   static Future<String> currentVersion() async => (await PackageInfo.fromPlatform()).version;
 
-  /// Newest published (non-draft) release; pre-releases count, since every
-  /// build here is published as one.
+  /// Newest published release. Pre-releases (`dev-*` test builds) are never offered.
   static Future<AppRelease?> latest() async {
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
     try {
@@ -100,7 +99,7 @@ class Updater {
       final suffix = assetSuffix();
       AppRelease? best;
       for (final r in body.whereType<Map>()) {
-        if (r['draft'] == true) continue;
+        if (r['draft'] == true || r['prerelease'] == true) continue;
         final tag = r['tag_name'];
         if (tag is! String) continue;
         ReleaseAsset? asset;

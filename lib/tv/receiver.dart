@@ -167,8 +167,6 @@ class TvReceiver {
   }
 
   TvState state() {
-    final n = remote.native;
-    if (n != null) return n.tvState();
     final c = remote.controller;
     if (c == null || !c.initialized) return TvState(active: _active, input: TvInput.field.value);
     final p = c.player.state;
@@ -410,8 +408,6 @@ class TvReceiver {
       await remote.close?.call();
       return null;
     }
-    final native = remote.native;
-    if (native != null) return native.command(body);
     if (c == null || !c.initialized) return 'TV chưa phát gì';
     final p = c.player;
     num? n(String k) => body[k] is num ? body[k] as num : null;

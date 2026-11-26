@@ -7,6 +7,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import '../bridge.dart';
 import '../util/tv_mode.dart';
+import 'media3_player.dart';
 import 'player_settings.dart';
 import 'subtitle_style.dart';
 import 'tv_playback_prefs.dart';
@@ -28,8 +29,11 @@ const libassAndroidFontName = 'Droid Sans Fallback';
 class PlayerHost {
   PlayerHost._(this.player, this.video);
 
+  /// Android TV with Media3: the picture is under the Flutter surface, there is no texture.
+  bool get isMedia3 => player.platform is Media3Player;
+
   final Player player;
-  final VideoController video;
+  final VideoController? video;
 
   /// Track ids mpv actually selected (`aid`/`sid`/`vid`). `player.state.track`
   /// only reports "auto" until the user picks a track, so the UI uses these.
@@ -37,7 +41,31 @@ class PlayerHost {
 
   static Future<PlayerHost>? _instance;
 
-  static Future<PlayerHost> get() => _instance ??= _create();
+  /// Media3 (TV setting): a fresh player per session, released when it ends. libmpv: one shared
+  /// instance for the app's lifetime (see above).
+  static Future<PlayerHost> get() {
+    if (TvPlaybackPrefs.nativePlayer) return _createMedia3();
+    return _instance ??= _create();
+  }
+
+  static Future<PlayerHost> _createMedia3() async {
+    final platform = Media3Player(
+      options: {
+        'matchFrameRate': TvPlaybackPrefs.matchFrameRate,
+        'tunneling': TvPlaybackPrefs.tunneling,
+        'bufferMb': PlayerSettings.bufferMb,
+        'audioLang': PlayerSettings.audioLang,
+        'subLang': PlayerSettings.subLang,
+      },
+    );
+    final player = Player(platformPlayer: platform);
+    final host = PlayerHost._(player, null);
+    player.stream.track.listen(
+      (t) => host.active.value = ActiveTracks(audio: t.audio.id, subtitle: t.subtitle.id, video: t.video.id),
+    );
+    appLog('player: media3 (picture under the Flutter UI)');
+    return host;
+  }
 
   /// The shared player if one was created (quitting must not start libmpv).
   static Future<PlayerHost>? get existing => _instance;
@@ -189,7 +217,8 @@ class PlaybackController {
 
   late final PlayerHost _host;
   Player get player => _host.player;
-  VideoController get video => _host.video;
+  VideoController? get video => _host.video;
+  bool get isMedia3 => _host.isMedia3;
   ValueListenable<ActiveTracks> get active => _host.active;
 
   /// Index of the item currently playing in [request.queue].
@@ -343,6 +372,7 @@ class PlaybackController {
 
   Future<String> _prop(String name) async {
     final n = player.platform;
+    if (n is Media3Player) return n.getProperty(name);
     if (n is! NativePlayer) return '';
     try {
       return await n.getProperty(name);
@@ -656,6 +686,7 @@ class PlaybackController {
   Future<void> _mpv(List<String> cmd) async {
     final native = player.platform;
     if (native is NativePlayer && !_disposed) await native.command(cmd);
+    if (native is Media3Player && !_disposed) await native.command(cmd);
   }
 
   /// Previous / next chapter, with its name in the notice.
@@ -672,6 +703,7 @@ class PlaybackController {
 
   /// Subtitle timing, ±100 ms per press.
   Future<void> subtitleDelay(double seconds) async {
+    if (isMedia3) return _say('Trình phát Media3 chưa chỉnh được lệch phụ đề (đổi sang mpv trong Cài đặt)');
     await _mpv(['add', 'sub-delay', seconds.toStringAsFixed(2)]);
     final d = double.tryParse(await _prop('sub-delay')) ?? 0;
     _say('Lệch phụ đề: ${d >= 0 ? '+' : ''}${(d * 1000).round()} ms');
@@ -705,7 +737,8 @@ class PlaybackController {
   /// Frame-rate matching (TV setting): once the film's rate is known, switch the display to a
   /// fitting mode and pause while it settles (the screen may go dark for about a second).
   Future<void> _matchFrameRate() async {
-    if (!TvPlaybackPrefs.matchFrameRate || _disposed) return;
+    // Media3 switches the display itself (Media3Host.kt), waiting for the TV like Fladder
+    if (!TvPlaybackPrefs.matchFrameRate || _disposed || isMedia3) return;
     final fps = double.tryParse(await _prop('container-fps')) ?? double.tryParse(await _prop('estimated-vf-fps')) ?? 0;
     if (fps < 10 || fps > 121) return;
     final before = TvPlaybackPrefs.displayRefreshRate();
@@ -740,8 +773,12 @@ class PlaybackController {
       await s.cancel();
     }
     // Stop only: the libmpv instance is reused by the next session.
-    await player.stop();
-    await player.setSubtitleTrack(SubtitleTrack.auto());
+    if (isMedia3) {
+      await player.dispose();
+    } else {
+      await player.stop();
+      await player.setSubtitleTrack(SubtitleTrack.auto());
+    }
     index.dispose();
     error.dispose();
     recovering.dispose();

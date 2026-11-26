@@ -14,8 +14,9 @@ import '../util/format.dart';
 import '../util/fullscreen.dart';
 import '../util/log.dart';
 import '../util/tv_mode.dart';
-import 'native_tv_player.dart';
+import 'media3_player.dart';
 import 'pip.dart';
+import 'tv_playback_prefs.dart';
 import 'player_settings.dart';
 import 'player_settings_screen.dart';
 import 'playback_controller.dart';
@@ -30,9 +31,6 @@ import 'widgets/track_sheets.dart';
 /// Lets something outside the screen (the TV receiver) drive the open player.
 class PlayerRemote {
   PlaybackController? controller;
-
-  /// Android TV: the Media3 player is open instead of [controller].
-  NativeTvPlayer? native;
   Future<void> Function()? close;
 }
 
@@ -84,7 +82,25 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// Picture mode, kept for the next sessions (like most players).
   static VideoFit _fitMode = VideoFit.contain;
   VideoFit get _fit => _fitMode;
-  set _fit(VideoFit v) => setState(() => _fitMode = v);
+  set _fit(VideoFit v) {
+    setState(() => _fitMode = v);
+    _applyFit();
+  }
+
+  /// Media3 (TV): the picture is a native view under Flutter, its resize mode follows [_fit].
+  /// Forced aspect ratios are not available there and fall back to "fit".
+  void _applyFit() {
+    final p = c.player.platform;
+    if (p is! Media3Player) return;
+    p.setFit(switch (_fitMode) {
+      VideoFit.cover => 'zoom',
+      VideoFit.fill => 'fill',
+      _ => 'fit',
+    });
+  }
+
+  /// Media3 on a TV: transparent player screen, the video is under the Flutter surface.
+  final bool _media3 = TvPlaybackPrefs.nativePlayer;
   double _pinchStart = 1;
 
   // One-finger vertical swipes (touch): left half = brightness, right half = volume.
@@ -108,6 +124,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // Resumed from elsewhere (TV remote, phone): let the controls fade again.
     _ready.then((_) {
       if (!mounted) return;
+      _applyFit();
       _playingSub = c.player.stream.playing.listen((playing) {
         if (playing && _overlay) _restartHideTimer();
         // phones: Home while playing shrinks the film into a small window
@@ -616,7 +633,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         _close();
       },
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: _media3 ? Colors.transparent : Colors.black,
         body: FutureBuilder<void>(
           future: _ready,
           builder: (context, snap) {
@@ -663,9 +680,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (_videoVisible)
+          if (_media3)
+            const SizedBox.shrink()
+          else if (_videoVisible)
             Video(
-              controller: c.video,
+              controller: c.video!,
               controls: NoVideoControls,
               fill: Colors.black,
               fit: _fit.boxFit,

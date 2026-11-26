@@ -17,12 +17,31 @@ import android.view.KeyEvent
 import androidx.core.content.FileProvider
 import java.io.File
 import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.RenderMode
+import io.flutter.embedding.android.TransparencyMode
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private var channel: MethodChannel? = null
     private var pipChannel: MethodChannel? = null
+    private var media3: Media3Host? = null
+
+    /// TVs: the Flutter surface is transparent and above the Media3 video surface, so the app's
+    /// Flutter player controls are drawn over hardware-decoded video (no GPU copy). Elsewhere
+    /// Flutter keeps its default opaque surface.
+    private val tvSurface by lazy { isTv() }
+
+    override fun getRenderMode(): RenderMode = if (tvSurface) RenderMode.surface else super.getRenderMode()
+
+    override fun getTransparencyMode(): TransparencyMode =
+        if (tvSurface) TransparencyMode.transparent else super.getTransparencyMode()
+
+    override fun onDestroy() {
+        media3?.release()
+        media3 = null
+        super.onDestroy()
+    }
 
     /// Phone player playing: Home / recent apps shrink the video into a picture-in-picture window.
     private var pipArmed = false
@@ -54,33 +73,11 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
-        // Android TV: Media3 player in its own activity (NativePlayerActivity).
-        val native = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "torboxstrm/native_player")
-        NativePlayerBridge.channel = native
-        native.setMethodCallHandler { call, result ->
-            when (call.method) {
-                "open" -> {
-                    val args = call.arguments as? Map<*, *> ?: return@setMethodCallHandler result.success(false)
-                    // A new title replaces the one playing. The old player may still be closing
-                    // (display mode restore) or belong to a Flutter engine Android recreated:
-                    // always start a fresh player activity, never reuse the old one.
-                    NativePlayerBridge.activity?.let { old ->
-                        NativePlayerBridge.log("native player: replacing the open player")
-                        old.command("stop", emptyMap<String, Any>())
-                    }
-                    NativePlayerBridge.pendingArgs = args
-                    startActivity(Intent(this, NativePlayerActivity::class.java))
-                    result.success(true)
-                }
-                "command" -> {
-                    val player = NativePlayerBridge.activity
-                        ?: return@setMethodCallHandler result.success("Trình phát đã đóng")
-                    val args = call.arguments as? Map<*, *> ?: emptyMap<String, Any>()
-                    result.success(player.command(args["action"] as? String ?: "", args))
-                }
-                else -> result.notImplemented()
-            }
-        }
+        // Android TV: Media3 player under the transparent Flutter surface (Media3Host.kt).
+        val media3Channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "torboxstrm/media3")
+        val host = Media3Host(this, media3Channel)
+        media3 = host
+        media3Channel.setMethodCallHandler { call, result -> host.handle(call, result) }
         // Opens the web UI's "intent://…" links for external players (VLC, MX Player…)
         // exactly as Chrome would, including S.browser_fallback_url.
         channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "torboxstrm/intent")
@@ -201,11 +198,6 @@ class MainActivity : FlutterActivity() {
             "back" -> KeyEvent.KEYCODE_BACK
             "playpause" -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
             else -> return false
-        }
-        // the TV player is on top: the key goes to it
-        NativePlayerBridge.activity?.let { player ->
-            player.runOnUiThread { player.pressKey(code) }
-            return true
         }
         runOnUiThread {
             val t = SystemClock.uptimeMillis()
