@@ -1,3 +1,9 @@
+**Có gì mới trong 2.2.3**
+- **Windows: toàn màn hình thật** — phim phủ kín màn hình, không còn thanh tiêu đề và thanh tác vụ (trước đây chỉ phóng to cửa sổ). Thoát toàn màn hình trả cửa sổ về như cũ.
+- **Windows: một thanh tiêu đề** — bỏ thanh nút thứ hai của trang web trong cửa sổ app (tải lại / về trang chủ trong bảng chọn, Alt+← để lùi trang).
+- **Nền phụ đề 3 mức:** Không / Đen mờ / Đen đặc (Đen đặc che được cả phụ đề in sẵn trong phim), lề quanh chữ rộng hơn cho đỡ thô.
+- Trình phát có thư mục bộ đệm riêng (hết lỗi "Failed to create file cache" trên Windows / Android).
+
 **Có gì mới trong 2.2.2**
 - **Font phụ đề hợp tiếng Việt:** mặc định chuyển sang **Be Vietnam Pro** (dấu đặt gọn, dễ đọc); đổi được Roboto / Noto Sans / Droid Sans (cũ) trong bảng Kiểu chữ phụ đề (nút **T** hoặc "Kiểu chữ" trong bảng phụ đề). Áp dụng cả điện thoại, máy tính và TV.
 - **Điện thoại: khớp tần số màn hình** — phim 24 fps chạy ở 120 Hz, 30 fps ở 60 Hz, tránh giật đều khi máy tự hạ về 60 Hz. Tắt được trong Cài đặt trình phát.
