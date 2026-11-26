@@ -8,8 +8,6 @@ import '../bridge.dart';
 import '../player/playback_controller.dart';
 import '../player/player_settings_screen.dart';
 import '../player/player_screen.dart';
-import '../screens/browser_screen.dart';
-import '../screens/connect_screen.dart';
 import '../player/tv_playback_prefs.dart';
 import '../screens/role_screen.dart';
 import '../update/update_ui.dart';
@@ -122,13 +120,6 @@ class _TvHomeState extends State<TvHome> {
     }
   }
 
-  void _browse() {
-    final server = _server;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => server == null ? const ConnectScreen() : BrowserScreen(server: server)),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
@@ -170,7 +161,7 @@ class _TvHomeState extends State<TvHome> {
                         Text(
                           _server == null
                               ? 'TV chưa có máy chủ: kết nối điện thoại (đã vào máy chủ) là TV nhận luôn.'
-                              : 'Máy chủ: đã có (${ServerStore.label(_server!)}). Đăng nhập: bấm "Duyệt phim trên TV", TV hiện QR, quét bằng điện thoại có app rồi bấm "Cho phép".',
+                              : 'Máy chủ: ${ServerStore.label(_server!)}. Chọn phim trên điện thoại rồi bấm "Phát trên TV".',
                           style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                         ),
                         if (_rx.lastPhone.value != null) ...[
@@ -185,12 +176,6 @@ class _TvHomeState extends State<TvHome> {
                           spacing: 16,
                           runSpacing: 12,
                           children: [
-                            FilledButton.icon(
-                              autofocus: true,
-                              onPressed: _browse,
-                              icon: const Icon(IconsaxPlusLinear.global),
-                              label: const Text('Duyệt phim trên TV'),
-                            ),
                             OutlinedButton.icon(
                               onPressed: () async {
                                 await saveRole(tv: false);

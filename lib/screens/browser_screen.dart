@@ -494,9 +494,6 @@ class _BrowserScreenState extends State<BrowserScreen> {
           onPageFinished: (url) {
             appLog('page finished $url');
             _loaded = true;
-            // Old System WebViews (modded TV ROMs) cannot run document-start scripts, so the page
-            // never learnt it runs on a TV and the remote's arrows did nothing after logging in.
-            if (isTvDevice) unawaited(_ensureTvPage());
             _logViewport();
           },
           onWebResourceError: (e) {
@@ -1070,38 +1067,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
     );
   }
 
-  Future<void> _ensureTvPage() async {
-    try {
-      await _web.runJavaScript(
-        'if(!window.TorBoxStrmApp){Object.defineProperty(window,"TorBoxStrmApp",{value:Object.freeze('
-        '{v:$bridgeVersion,platform:${jsonEncode(_platform)},tv:true,screen:${screenJs()}})});}'
-        'if(typeof tvApply==="function")tvApply();',
-      );
-    } catch (e) {
-      appLog('tv page script: $e');
-    }
-  }
-
-  /// On a TV the remote's arrows and OK belong to the page (its own TV mode
-  /// moves focus between cards); Flutter's default shortcuts would take them
-  /// for widget focus traversal instead. DoNothingAndStopPropagationIntent
-  /// leaves the key unhandled, so it reaches the WebView.
-  Widget _webView() {
-    final view = WebViewWidget(controller: _web);
-    if (!isTvDevice) return view;
-    const pass = DoNothingAndStopPropagationIntent();
-    return Shortcuts(
-      shortcuts: const {
-        SingleActivator(LogicalKeyboardKey.arrowUp): pass,
-        SingleActivator(LogicalKeyboardKey.arrowDown): pass,
-        SingleActivator(LogicalKeyboardKey.arrowLeft): pass,
-        SingleActivator(LogicalKeyboardKey.arrowRight): pass,
-        SingleActivator(LogicalKeyboardKey.select): pass,
-        SingleActivator(LogicalKeyboardKey.enter): pass,
-      },
-      child: view,
-    );
-  }
+  Widget _webView() => WebViewWidget(controller: _web);
 
   /// Main window while the web UI is in its own window.
   Widget _windowPanel(BuildContext context) {
