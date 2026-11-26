@@ -808,31 +808,22 @@ class _BrowserScreenState extends State<BrowserScreen> {
     await _web.loadRequest(widget.server);
   }
 
-  /// Android Back / back swipe: walks the page history (detail pages and the player are history
-  /// entries too). With nothing to go back to: on the home page it opens the app menu (reload,
-  /// TV remote, server, settings…); on any other page it goes to the home page first.
+  /// Android Back / back swipe. A detail page, the web player or a dialog open on the page:
+  /// back closes it (they are history entries). Otherwise, on any tab of the main page: the app
+  /// menu (reload, TV remote, server, settings…), instead of stepping back through tab switches.
   Future<void> _onBack() async {
-    if (await _web.canGoBack()) {
+    var overlay = false;
+    try {
+      final r = await _web.runJavaScriptReturningResult(
+        '(typeof OVS!=="undefined"&&OVS.length>0)||(typeof topLayer==="function"&&!!topLayer())',
+      );
+      overlay = r == true || r.toString() == 'true';
+    } catch (_) {}
+    if (overlay && await _web.canGoBack()) {
       await _web.goBack();
       return;
     }
-    if (!mounted) return;
-    String? url;
-    try {
-      url = await _web.currentUrl();
-    } catch (_) {}
-    final here = url == null ? null : Uri.tryParse(url);
-    final home = widget.server;
-    final atHome =
-        here == null ||
-        (here.origin == home.origin &&
-            (here.path.isEmpty || here.path == '/' || here.path == home.path) &&
-            here.query.isEmpty);
-    if (atHome) {
-      await _showAppMenu();
-    } else {
-      await _home();
-    }
+    if (mounted) await _showAppMenu();
   }
 
   /// "📱 Ứng dụng" in the page's account menu: phones have no toolbar, and
