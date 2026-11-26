@@ -1,3 +1,9 @@
+**Có gì mới trong 2.2.2**
+- **Font phụ đề hợp tiếng Việt:** mặc định chuyển sang **Be Vietnam Pro** (dấu đặt gọn, dễ đọc); đổi được Roboto / Noto Sans / Droid Sans (cũ) trong bảng Kiểu chữ phụ đề (nút **T** hoặc "Kiểu chữ" trong bảng phụ đề). Áp dụng cả điện thoại, máy tính và TV.
+- **Điện thoại: khớp tần số màn hình** — phim 24 fps chạy ở 120 Hz, 30 fps ở 60 Hz, tránh giật đều khi máy tự hạ về 60 Hz. Tắt được trong Cài đặt trình phát.
+- **Thông tin chẩn đoán** (mặc định tắt): Cài đặt trình phát → Chẩn đoán, hoặc phím **D** — trình phát, bộ giải mã, tần số màn hình, khung hình rơi, bộ đệm, tốc độ tải, RAM.
+- Bỏ nút ⋯ trùng trên trình phát: bấm nhãn "1080p · HEVC" để xem thông tin phát.
+
 **Có gì mới trong 2.2.1** (gồm cả 2.2.0)
 - **TV: trình phát Media3 dùng chung giao diện với điện thoại / PC.** Hình đi thẳng từ chip giải mã ra màn hình (không qua GPU), giao diện điều khiển của app phủ lên trên: thanh tiến trình tua bằng remote, bảng phụ đề / âm thanh, phụ đề server, tìm phụ đề online, **đổi khung hình** (vừa / lấp đầy / kéo giãn), tốc độ, cài đặt, thông tin phát. Media3 chưa có lệch phụ đề và chương phim (chọn "mpv" trong Cài đặt trình phát nếu cần).
 - **TV chỉ còn nhận phim từ điện thoại:** bỏ duyệt phim trên TV (khó dùng bằng remote trên box yếu). Chọn phim trên điện thoại rồi bấm "Phát trên TV"; TV không cần đăng nhập.
