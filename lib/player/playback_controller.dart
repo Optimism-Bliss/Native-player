@@ -726,6 +726,10 @@ class PlaybackController {
     final native = player.platform;
     if (native is! NativePlayer || _disposed) return;
     await native.setProperty('video-aspect-override', ratio == null ? 'no' : ratio.toStringAsFixed(4));
+    final v = player.state.videoParams;
+    appLog('player: aspect ${ratio?.toStringAsFixed(2) ?? 'file'} -> mpv override '
+        '${await _prop('video-aspect-override')}, out ${v.dw}x${v.dh}, after '
+        '${await _prop('video-out-params/dw')}x${await _prop('video-out-params/dh')}');
   }
 
   /// Chapters of the current file (MKV / MP4 chapter list); 0 or 1 hides the chapter buttons.

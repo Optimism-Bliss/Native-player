@@ -7,6 +7,10 @@ on:
     tags: ['v*', 'dev-*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Nền tảng cần dựng: all, hoặc danh sách như windows,android'
+        default: all
 
 permissions:
   contents: read
@@ -30,6 +34,7 @@ jobs:
 
   linux:
     needs: check
+    if: github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' || contains(inputs.platforms, 'linux')
     strategy:
       fail-fast: false
       matrix:
@@ -76,6 +81,7 @@ jobs:
 
   windows:
     needs: check
+    if: github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' || contains(inputs.platforms, 'windows')
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -120,6 +126,7 @@ jobs:
 
   android:
     needs: check
+    if: github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' || contains(inputs.platforms, 'android')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -171,6 +178,7 @@ jobs:
   # Unsigned IPA (no Apple account): users sign it while installing (TrollStore, AltStore, SideStore, eSign…).
   ios:
     needs: check
+    if: github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' || contains(inputs.platforms, 'ios')
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4

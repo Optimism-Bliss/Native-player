@@ -437,7 +437,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
         ),
       ),
     );
-    if (picked != null && mounted) _fit = picked;
+    if (picked != null && mounted) {
+      appLog('player: fit ${picked.name} (${MediaQuery.sizeOf(context)})');
+      _fit = picked;
+    }
   }
 
   void _flashSeek(bool forward, int seconds) {
