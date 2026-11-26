@@ -721,6 +721,50 @@ class PlaybackController {
     await _applySubtitlePosition();
   }
 
+  /// Black bars burned into the picture (a 4:3 film inside a 16:9 file, a 2.39:1 film with
+  /// bars above and below): mpv's cropdetect looks at a few frames, then a crop filter removes
+  /// them, so "fill" / "stretch" really fill the screen. [on] false removes the crop.
+  bool _cropOn = false;
+  Future<void> autoCrop(bool on) async {
+    final native = player.platform;
+    if (native is! NativePlayer || _disposed) return;
+    Future<void> vf(List<String> cmd) async {
+      try {
+        await native.command(cmd);
+      } catch (_) {}
+    }
+
+    if (!on) {
+      if (_cropOn) await vf(['vf', 'remove', '@tbcrop']);
+      _cropOn = false;
+      return;
+    }
+    if (_cropOn) return;
+    final v = player.state.videoParams;
+    final fw = v.w ?? 0, fh = v.h ?? 0;
+    if (fw <= 0 || fh <= 0) return;
+    await vf(['vf', 'add', '@tbdetect:cropdetect=limit=0.1:round=2:reset=0']);
+    // a few seconds of frames, so a dark scene does not count as a bar
+    await Future<void>.delayed(const Duration(milliseconds: 2500));
+    final w = int.tryParse(await _prop('vf-metadata/tbdetect/lavfi.cropdetect.w'));
+    final h = int.tryParse(await _prop('vf-metadata/tbdetect/lavfi.cropdetect.h'));
+    final x = int.tryParse(await _prop('vf-metadata/tbdetect/lavfi.cropdetect.x'));
+    final y = int.tryParse(await _prop('vf-metadata/tbdetect/lavfi.cropdetect.y'));
+    await vf(['vf', 'remove', '@tbdetect']);
+    if (_disposed || w == null || h == null || x == null || y == null) {
+      appLog('player: crop detect gave nothing');
+      return;
+    }
+    // only real bars: at least 3 % cut, roughly centred, and not most of the picture
+    final cutW = 1 - w / fw, cutH = 1 - h / fh;
+    final centred = (x - (fw - w - x)).abs() <= fw * 0.02 && (y - (fh - h - y)).abs() <= fh * 0.02;
+    appLog('player: crop detect ${w}x$h+$x+$y of ${fw}x$fh${centred ? '' : ' (off-centre, ignored)'}');
+    if (!centred || (cutW < 0.03 && cutH < 0.03) || cutW > 0.5 || cutH > 0.5) return;
+    await vf(['vf', 'add', '@tbcrop:crop=w=$w:h=$h:x=$x:y=$y']);
+    _cropOn = true;
+    _say('Đã cắt viền đen ${w}x$h');
+  }
+
   /// Forced aspect ratio inside mpv (works whatever draws the picture); null = file's own.
   Future<void> setAspectOverride(double? ratio) async {
     final native = player.platform;

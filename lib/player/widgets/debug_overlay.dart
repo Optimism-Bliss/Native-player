@@ -86,7 +86,7 @@ class _DebugOverlayState extends State<DebugOverlay> {
         child: Align(
           alignment: Alignment.topLeft,
           child: Container(
-            margin: const EdgeInsets.fromLTRB(12, 64, 12, 12),
+            margin: const EdgeInsets.fromLTRB(12, 140, 12, 12),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
               color: Colors.black.withValues(alpha: 0.62),

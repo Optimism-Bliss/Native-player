@@ -94,7 +94,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final p = c.player.platform;
     // mpv: forced ratios are applied by mpv itself (video-aspect-override). The picture size then
     // changes at the source, so the widget only has to fit it.
-    if (p is! Media3Player) return; // mpv: the picture box is sized in Flutter, see _videoBox
+    if (p is! Media3Player) {
+      // mpv: the picture box is sized in Flutter (see _videoBox); fill / stretch first cut bars
+      // burned into the file
+      c.autoCrop(_fitMode == VideoFit.cover || _fitMode == VideoFit.fill);
+      return;
+    }
     p.setFit(switch (_fitMode) {
       VideoFit.cover => 'zoom',
       VideoFit.fill => 'fill',
@@ -427,7 +432,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 selected: f == _fit,
                 leading: Icon(f == _fit ? IconsaxPlusBold.tick_circle : IconsaxPlusLinear.record, size: 20),
                 title: Text(f.label),
-                subtitle: Text(f.hint),
+                subtitle: Text(f == VideoFit.cover || f == VideoFit.fill ? '${f.hint} · tự cắt viền đen có sẵn trong phim' : f.hint),
                 onTap: () => Navigator.pop(context, f),
               ),
           ],
