@@ -83,13 +83,23 @@ class _StyleSheetState extends State<_StyleSheet> {
               value: s.bold,
               onChanged: (v) => _set(s.copyWith(bold: v)),
             ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Nền tối sau chữ'),
-              subtitle: const Text('Dễ đọc hơn trên cảnh sáng'),
-              value: s.box,
-              onChanged: (v) => _set(s.copyWith(box: v)),
+            const Text('Nền sau chữ'),
+            const SizedBox(height: 4),
+            Text('Đen đặc che được cả phụ đề in sẵn trong phim', style: text.bodySmall),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final (a, label) in SubtitleStyle.boxChoices)
+                  ChoiceChip(
+                    label: Text(label),
+                    selected: s.boxAlpha == a,
+                    onSelected: (_) => _set(s.copyWith(boxAlpha: a)),
+                  ),
+              ],
             ),
+            const SizedBox(height: 8),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,

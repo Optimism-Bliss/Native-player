@@ -468,6 +468,8 @@ class Media3Host(private val activity: Activity, private val channel: MethodChan
         val scale = (call.argument<Number>("scale") ?: 1.0).toFloat()
         val color = (call.argument<Number>("color") ?: 0xFFFFFFFF).toLong().toInt()
         val box = call.argument<Boolean>("box") == true
+        // 0xB0 translucent, 0xFF solid (also hides subtitles burned into the picture)
+        val boxAlpha = (call.argument<Number>("boxAlpha") ?: 0xB0).toInt().coerceIn(0, 255)
         val bold = call.argument<Boolean>("bold") != false
         val border = (call.argument<Number>("border") ?: 3).toFloat()
         // bundled Vietnamese-friendly typeface (Flutter asset), bold file when "bold" is on
@@ -479,7 +481,7 @@ class Media3Host(private val activity: Activity, private val channel: MethodChan
         sv.setStyle(
             CaptionStyleCompat(
                 color,
-                if (box) 0xB0000000.toInt() else Color.TRANSPARENT,
+                if (box) (boxAlpha shl 24) else Color.TRANSPARENT,
                 Color.TRANSPARENT,
                 if (border > 0 && !box) CaptionStyleCompat.EDGE_TYPE_OUTLINE else CaptionStyleCompat.EDGE_TYPE_NONE,
                 Color.BLACK,
