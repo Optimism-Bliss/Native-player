@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
 
+import '../subtitle_fonts.dart';
 import '../subtitle_style.dart';
 
 /// Size, weight, colour and background of subtitles; applied live and kept for next time.
@@ -43,6 +44,21 @@ class _StyleSheetState extends State<_StyleSheet> {
             Text('Kiểu chữ phụ đề', style: text.titleLarge),
             const SizedBox(height: 4),
             Text('Áp dụng cho SRT / VTT; phụ đề ASS giữ kiểu riêng của nó.', style: text.bodySmall),
+            const SizedBox(height: 16),
+            const Text('Font chữ'),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final f in SubtitleFonts.all)
+                  ChoiceChip(
+                    label: Text(f.label),
+                    selected: s.font == f.family,
+                    onSelected: (_) => _set(s.copyWith(font: f.family)),
+                  ),
+              ],
+            ),
             const SizedBox(height: 16),
             Text('Cỡ chữ: ${(s.scale * 100).round()}%'),
             Slider(

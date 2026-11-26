@@ -2,11 +2,22 @@ import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'media3_player.dart';
+import 'subtitle_fonts.dart';
 
 /// How plain subtitles (SRT, VTT, and ASS when overridden) look, kept between sessions.
 /// Applied to libmpv: `sub-scale`, `sub-bold`, `sub-color`, `sub-border-*`, `sub-back-color`.
 class SubtitleStyle {
-  const SubtitleStyle({this.scale = 1.0, this.bold = true, this.color = 0xFFFFFFFF, this.box = false, this.border = 3});
+  const SubtitleStyle({
+    this.scale = 1.0,
+    this.bold = true,
+    this.color = 0xFFFFFFFF,
+    this.box = false,
+    this.border = 3,
+    this.font = 'Be Vietnam Pro',
+  });
+
+  /// Typeface family (SubtitleFonts.all).
+  final String font;
 
   final double scale;
   final bool bold;
@@ -25,13 +36,15 @@ class SubtitleStyle {
 
   static SubtitleStyle current = const SubtitleStyle();
 
-  SubtitleStyle copyWith({double? scale, bool? bold, int? color, bool? box, double? border}) => SubtitleStyle(
-    scale: scale ?? this.scale,
-    bold: bold ?? this.bold,
-    color: color ?? this.color,
-    box: box ?? this.box,
-    border: border ?? this.border,
-  );
+  SubtitleStyle copyWith({double? scale, bool? bold, int? color, bool? box, double? border, String? font}) =>
+      SubtitleStyle(
+        scale: scale ?? this.scale,
+        bold: bold ?? this.bold,
+        color: color ?? this.color,
+        box: box ?? this.box,
+        border: border ?? this.border,
+        font: font ?? this.font,
+      );
 
   static Future<void> load() async {
     final p = await SharedPreferences.getInstance();
@@ -41,6 +54,7 @@ class SubtitleStyle {
       color: p.getInt('sub_style_color') ?? 0xFFFFFFFF,
       box: p.getBool('sub_style_box') ?? false,
       border: (p.getDouble('sub_style_border') ?? 3).clamp(0, 6),
+      font: SubtitleFonts.byFamily(p.getString('sub_style_font') ?? 'Be Vietnam Pro').family,
     );
   }
 
@@ -52,6 +66,7 @@ class SubtitleStyle {
     await p.setInt('sub_style_color', color);
     await p.setBool('sub_style_box', box);
     await p.setDouble('sub_style_border', border);
+    await p.setString('sub_style_font', font);
   }
 
   static String _hex(int argb) {
@@ -63,10 +78,20 @@ class SubtitleStyle {
   Future<void> apply(Player player) async {
     final native = player.platform;
     if (native is Media3Player) {
-      return native.setSubtitleStyle({'scale': scale, 'bold': bold, 'color': color, 'box': box, 'border': border});
+      final f = SubtitleFonts.byFamily(font);
+      return native.setSubtitleStyle({
+        'scale': scale,
+        'bold': bold,
+        'color': color,
+        'box': box,
+        'border': border,
+        'font': 'flutter_assets/assets/fonts/${f.regular}',
+        'fontBold': f.bold == null ? null : 'flutter_assets/assets/fonts/${f.bold}',
+      });
     }
     if (native is! NativePlayer) return;
     for (final (k, v) in [
+      ('sub-font', SubtitleFonts.byFamily(font).family),
       ('sub-scale', scale.toStringAsFixed(2)),
       ('sub-bold', bold ? 'yes' : 'no'),
       ('sub-color', _hex(color)),

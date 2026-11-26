@@ -70,6 +70,13 @@ dev_dependencies:
 flutter:
   assets:
     - assets/fonts/DroidSansFallback.ttf
+    # subtitle fonts (Vietnamese), subset to Latin + Vietnamese, SIL OFL (assets/fonts/OFL-*.txt)
+    - assets/fonts/BeVietnamPro-SemiBold.ttf
+    - assets/fonts/BeVietnamPro-Bold.ttf
+    - assets/fonts/Roboto-Medium.ttf
+    - assets/fonts/Roboto-Bold.ttf
+    - assets/fonts/NotoSans-Medium.ttf
+    - assets/fonts/NotoSans-Bold.ttf
   fonts:
     - family: Rubik
       fonts:

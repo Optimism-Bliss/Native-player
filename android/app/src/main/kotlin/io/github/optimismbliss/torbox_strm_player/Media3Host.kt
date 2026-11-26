@@ -470,6 +470,11 @@ class Media3Host(private val activity: Activity, private val channel: MethodChan
         val box = call.argument<Boolean>("box") == true
         val bold = call.argument<Boolean>("bold") != false
         val border = (call.argument<Number>("border") ?: 3).toFloat()
+        // bundled Vietnamese-friendly typeface (Flutter asset), bold file when "bold" is on
+        val asset = (if (bold) call.argument<String>("fontBold") else null) ?: call.argument<String>("font")
+        val face = asset?.let { a ->
+            typefaces.getOrPut(a) { runCatching { Typeface.createFromAsset(activity.assets, a) }.getOrNull() }
+        } ?: if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
         sv.setFractionalTextSize(0.055f * scale)
         sv.setStyle(
             CaptionStyleCompat(
@@ -478,10 +483,12 @@ class Media3Host(private val activity: Activity, private val channel: MethodChan
                 Color.TRANSPARENT,
                 if (border > 0 && !box) CaptionStyleCompat.EDGE_TYPE_OUTLINE else CaptionStyleCompat.EDGE_TYPE_NONE,
                 Color.BLACK,
-                if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT,
+                face,
             )
         )
     }
+
+    private val typefaces = HashMap<String, Typeface?>()
 
     // ---------------- frame-rate matching ----------------
 

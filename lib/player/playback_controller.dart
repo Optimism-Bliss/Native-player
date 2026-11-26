@@ -10,6 +10,7 @@ import '../bridge.dart';
 import '../util/tv_mode.dart';
 import 'media3_player.dart';
 import 'player_settings.dart';
+import 'subtitle_fonts.dart';
 import 'subtitle_style.dart';
 import 'tv_playback_prefs.dart';
 import '../util/log.dart';
@@ -85,6 +86,7 @@ class PlayerHost {
 
   static Future<PlayerHost> _create() async {
     MediaKit.ensureInitialized();
+    final fontsDir = await SubtitleFonts.prepare();
     final player = Player(
       configuration: const PlayerConfiguration(
         title: 'TorBox STRM',
@@ -121,6 +123,7 @@ class PlayerHost {
       appLog(line);
     });
     final native = player.platform;
+    if (native is NativePlayer && fontsDir != null) await native.setProperty('sub-fonts-dir', fontsDir);
     if (native is NativePlayer) {
       // Same network/cache tuning Fladder uses for direct HTTP playback.
       await native.setProperty('force-seekable', 'yes');
