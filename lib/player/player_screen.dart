@@ -94,10 +94,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final p = c.player.platform;
     // mpv: forced ratios are applied by mpv itself (video-aspect-override). The picture size then
     // changes at the source, so the widget only has to fit it.
-    if (p is! Media3Player) {
-      c.setAspectOverride(_fitMode.aspectRatio);
-      return;
-    }
+    if (p is! Media3Player) return; // mpv: the picture box is sized in Flutter, see _videoBox
     p.setFit(switch (_fitMode) {
       VideoFit.cover => 'zoom',
       VideoFit.fill => 'fill',
@@ -688,6 +685,38 @@ class _PlayerScreenState extends State<PlayerScreen> {
     c.setFrameCrop(hidden);
   }
 
+  /// Sizes the picture in Flutter from the video's display aspect and the chosen fit. The native
+  /// texture's own size is not trusted: on Windows it did not follow aspect changes, so fit,
+  /// fill and forced ratios all looked the same.
+  Widget _videoBox(Widget video) {
+    return StreamBuilder<VideoParams>(
+      stream: c.player.stream.videoParams,
+      initialData: c.player.state.videoParams,
+      builder: (context, snap) => LayoutBuilder(
+        builder: (context, box) {
+          final v = snap.data ?? c.player.state.videoParams;
+          final w = (v.dw ?? v.w ?? 0).toDouble(), h = (v.dh ?? v.h ?? 0).toDouble();
+          final sw = box.maxWidth, sh = box.maxHeight;
+          if (w <= 0 || h <= 0 || !sw.isFinite || !sh.isFinite || _fit == VideoFit.fill) return video;
+          final aspect = _fit.aspectRatio ?? w / h;
+          final screen = sw / sh;
+          final byWidth = _fit == VideoFit.cover ? aspect < screen : aspect >= screen;
+          final bw = byWidth ? sw : sh * aspect, bh = byWidth ? sw / aspect : sh;
+          return ColoredBox(
+            color: Colors.black,
+            child: ClipRect(
+              child: OverflowBox(
+                maxWidth: bw,
+                maxHeight: bh,
+                child: SizedBox(width: bw, height: bh, child: video),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildPlayer(BuildContext context) {
     _paramsSub ??= c.player.stream.videoParams.listen((_) => _syncFrameCrop());
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncFrameCrop());
@@ -701,13 +730,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
           if (_media3)
             const SizedBox.shrink()
           else if (_videoVisible)
-            Video(
-              controller: c.video!,
-              controls: NoVideoControls,
-              fill: Colors.black,
-              fit: _fit.boxFit,
-              // libass renders every subtitle format inside mpv (styled ASS included).
-              subtitleViewConfiguration: const SubtitleViewConfiguration(visible: false),
+            _videoBox(
+              Video(
+                controller: c.video!,
+                controls: NoVideoControls,
+                fill: Colors.black,
+                // the box around it already has the chosen shape (see _videoBox)
+                fit: BoxFit.fill,
+                // libass renders every subtitle format inside mpv (styled ASS included).
+                subtitleViewConfiguration: const SubtitleViewConfiguration(visible: false),
+              ),
             )
           else
             const ColoredBox(color: Colors.black),
