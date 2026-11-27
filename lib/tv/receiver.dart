@@ -247,6 +247,8 @@ class TvReceiver {
               'subs' => SubtitleList.parse(msg),
               'subText' => SubtitleText.parse(msg),
               'subSearch' => SubtitleSearch.parse(msg),
+              'alts' => Alternatives.parse(msg),
+              'altUrl' => AltUrl.parse(msg),
               _ => null,
             };
             if (parsed != null) pageIn.add(parsed);

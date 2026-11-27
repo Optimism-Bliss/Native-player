@@ -92,14 +92,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// Forced aspect ratios are not available there and fall back to "fit".
   void _applyFit() {
     final p = c.player.platform;
-    // mpv: forced ratios are applied by mpv itself (video-aspect-override). The picture size then
-    // changes at the source, so the widget only has to fit it.
-    if (p is! Media3Player) {
-      // mpv: the picture box is sized in Flutter (see _videoBox); fill / stretch first cut bars
-      // burned into the file
-      c.autoCrop(_fitMode == VideoFit.cover || _fitMode == VideoFit.fill);
-      return;
-    }
+    _freeScale = 1;
+    _freeOffset = Offset.zero;
+    if (p is! Media3Player) return;
     p.setFit(switch (_fitMode) {
       VideoFit.cover => 'zoom',
       VideoFit.fill => 'fill',
@@ -257,6 +252,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   Future<void> _onScaleStart(ScaleStartDetails d) async {
     _pinchStart = 1;
+    if (_fit == VideoFit.free) {
+      _freeScaleStart = _freeScale;
+      return;
+    }
     _swipeIsPinch = d.pointerCount > 1;
     _swipeSide = null;
     final size = MediaQuery.sizeOf(context);
@@ -279,6 +278,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   void _onScaleUpdate(ScaleUpdateDetails d) {
+    if (_fit == VideoFit.free) {
+      final size = MediaQuery.sizeOf(context);
+      setState(() {
+        if (d.pointerCount > 1) _freeScale = (_freeScaleStart * d.scale).clamp(1.0, 5.0);
+        // keep the picture covering its box: at most half the extra size each way
+        final mx = size.width * (_freeScale - 1) / 2, my = size.height * (_freeScale - 1) / 2;
+        final o = _freeOffset + d.focalPointDelta;
+        _freeOffset = Offset(o.dx.clamp(-mx, mx), o.dy.clamp(-my, my));
+      });
+      return;
+    }
     if (d.pointerCount > 1 || _swipeIsPinch) {
       _swipeIsPinch = true;
       _pinchStart = d.scale;
@@ -301,6 +311,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   void _onScaleEnd(ScaleEndDetails d) {
+    if (_fit == VideoFit.free) return;
     if (_swipeIsPinch) {
       if (_pinchStart > 1.15 && _fit != VideoFit.cover) {
         _fit = VideoFit.cover;
@@ -411,6 +422,70 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
   }
 
+  /// Other versions in the library and other sources (addons) for the same movie / episode; picking one keeps the
+  /// position and the subtitle choice.
+  Future<void> _pickAlternative() async {
+    _restartHideTimer();
+    unawaited(c.requestAlternatives());
+    final picked = await showModalBottomSheet<AltOption>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.75),
+          child: ValueListenableBuilder<bool>(
+            valueListenable: c.alternativesLoading,
+            builder: (context, loading, _) => ValueListenableBuilder<Alternatives?>(
+              valueListenable: c.alternatives,
+              builder: (context, alts, _) {
+                final text = Theme.of(context).textTheme;
+                Widget head(String t) => Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                      child: Text(t, style: text.titleSmall),
+                    );
+                Widget tile(AltOption o) => ListTile(
+                      dense: true,
+                      leading: Icon(o.library ? IconsaxPlusLinear.folder_2 : (o.cached ? IconsaxPlusLinear.flash_1 : IconsaxPlusLinear.cloud), size: 20),
+                      title: Text(o.label, maxLines: 2, overflow: TextOverflow.ellipsis),
+                      subtitle: o.library ? null : Text(o.cached ? 'Đã cache — mở ngay' : 'Chưa cache — có thể phải chờ'),
+                      onTap: () => Navigator.pop(context, o),
+                    );
+                return ListView(
+                  shrinkWrap: true,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                      child: Text('Đổi bản / nguồn phát', style: text.titleMedium),
+                    ),
+                    if (loading || alts == null)
+                      const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
+                    else ...[
+                      if (alts.library.isNotEmpty) head('Bản trong thư viện'),
+                      ...alts.library.map(tile),
+                      if (alts.streams.isNotEmpty) head('Nguồn khác (addon)'),
+                      ...alts.streams.map(tile),
+                      if (alts.library.isEmpty && alts.streams.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text(alts.message.isNotEmpty ? alts.message : 'Không tìm thấy bản khác cho đúng phim / tập này.'),
+                        ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                        child: Text('Giữ vị trí đang xem và phụ đề đã chọn. Phụ đề ngoài có thể lệch thời gian với bản khác — chỉnh độ trễ trong menu phụ đề.',
+                            style: text.bodySmall),
+                      ),
+                    ],
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    if (picked != null && mounted) await c.pickAlternative(picked);
+  }
+
   Future<void> _pickFit() async {
     _restartHideTimer();
     final picked = await showModalBottomSheet<VideoFit>(
@@ -424,7 +499,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
               child: Text('Tỉ lệ khung hình', style: Theme.of(context).textTheme.titleMedium),
             ),
-            for (final f in VideoFit.values)
+            for (final f in VideoFit.values.where((f) => f != VideoFit.free || (_touch && !_media3)))
               ListTile(
                 dense: true,
                 visualDensity: VisualDensity.compact,
@@ -432,7 +507,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 selected: f == _fit,
                 leading: Icon(f == _fit ? IconsaxPlusBold.tick_circle : IconsaxPlusLinear.record, size: 20),
                 title: Text(f.label),
-                subtitle: Text(f == VideoFit.cover || f == VideoFit.fill ? '${f.hint} · tự cắt viền đen có sẵn trong phim' : f.hint),
+                subtitle: Text(f.hint),
                 onTap: () => Navigator.pop(context, f),
               ),
           ],
@@ -690,34 +765,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
     c.setFrameCrop(hidden);
   }
 
-  /// Sizes the picture in Flutter from the video's display aspect and the chosen fit. The native
-  /// texture's own size is not trusted: on Windows it did not follow aspect changes, so fit,
-  /// fill and forced ratios all looked the same.
-  Widget _videoBox(Widget video) {
-    return StreamBuilder<VideoParams>(
-      stream: c.player.stream.videoParams,
-      initialData: c.player.state.videoParams,
-      builder: (context, snap) => LayoutBuilder(
-        builder: (context, box) {
-          final v = snap.data ?? c.player.state.videoParams;
-          final w = (v.dw ?? v.w ?? 0).toDouble(), h = (v.dh ?? v.h ?? 0).toDouble();
-          final sw = box.maxWidth, sh = box.maxHeight;
-          if (w <= 0 || h <= 0 || !sw.isFinite || !sh.isFinite || _fit == VideoFit.fill) return video;
-          final aspect = _fit.aspectRatio ?? w / h;
-          final screen = sw / sh;
-          final byWidth = _fit == VideoFit.cover ? aspect < screen : aspect >= screen;
-          final bw = byWidth ? sw : sh * aspect, bh = byWidth ? sw / aspect : sh;
-          return ColoredBox(
-            color: Colors.black,
-            child: ClipRect(
-              child: OverflowBox(
-                maxWidth: bw,
-                maxHeight: bh,
-                child: SizedBox(width: bw, height: bh, child: video),
-              ),
-            ),
-          );
-        },
+  /// "Tự do" (touch screens): pinch to zoom 1–5×, drag with one finger to move the picture.
+  double _freeScale = 1, _freeScaleStart = 1;
+  Offset _freeOffset = Offset.zero;
+
+  Widget _freeform(Widget video) {
+    if (_fit != VideoFit.free) return video;
+    return ClipRect(
+      child: Transform(
+        transform: Matrix4.identity()
+          ..translateByDouble(_freeOffset.dx, _freeOffset.dy, 0, 1)
+          ..scaleByDouble(_freeScale, _freeScale, 1, 1),
+        alignment: Alignment.center,
+        child: video,
       ),
     );
   }
@@ -735,13 +795,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
           if (_media3)
             const SizedBox.shrink()
           else if (_videoVisible)
-            _videoBox(
+            _freeform(
               Video(
                 controller: c.video!,
                 controls: NoVideoControls,
                 fill: Colors.black,
-                // the box around it already has the chosen shape (see _videoBox)
-                fit: BoxFit.fill,
+                fit: _fit.boxFit,
                 // libass renders every subtitle format inside mpv (styled ASS included).
                 subtitleViewConfiguration: const SubtitleViewConfiguration(visible: false),
               ),
@@ -1058,6 +1117,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               )
                             : TextButton(onPressed: _pickSpeed, child: Text('${_rateLabel(rate)}×'));
                       },
+                    ),
+                    IconButton(
+                      tooltip: 'Bản khác / nguồn khác',
+                      onPressed: _pickAlternative,
+                      icon: const Icon(IconsaxPlusLinear.arrow_swap_horizontal),
                     ),
                     IconButton(
                       tooltip: 'Tỉ lệ khung hình: ${_fit.label}',
@@ -1384,18 +1448,15 @@ class _ErrorPanel extends StatelessWidget {
 
 /// Picture modes: fit / fill (crop) / stretch and fixed display ratios.
 enum VideoFit {
-  contain('Vừa màn hình', 'Giữ nguyên tỉ lệ, có viền đen', BoxFit.contain, null),
-  cover('Lấp đầy', 'Phóng to cho kín màn hình, cắt bớt mép', BoxFit.cover, null),
-  fill('Kéo giãn', 'Kéo hình cho vừa khít màn hình', BoxFit.fill, null),
-  r169('16:9', 'Ép tỉ lệ 16:9', BoxFit.contain, 16 / 9),
-  r219('21:9', 'Ép tỉ lệ 21:9 (2.39:1)', BoxFit.contain, 2.39),
-  r43('4:3', 'Ép tỉ lệ 4:3', BoxFit.contain, 4 / 3);
+  contain('Vừa màn hình', 'Giữ nguyên tỉ lệ, có viền đen', BoxFit.contain),
+  cover('Lấp đầy', 'Phóng to cho kín màn hình, cắt bớt mép', BoxFit.cover),
+  fill('Kéo giãn', 'Kéo hình cho vừa khít màn hình', BoxFit.fill),
+  free('Tự do', 'Chụm 2 ngón để phóng to, kéo 1 ngón để di chuyển hình', BoxFit.contain);
 
-  const VideoFit(this.label, this.hint, this.boxFit, this.aspectRatio);
+  const VideoFit(this.label, this.hint, this.boxFit);
   final String label;
   final String hint;
   final BoxFit boxFit;
-  final double? aspectRatio;
 }
 
 /// Title logo from TMDB (like Fladder's ItemLogo), with the episode/version

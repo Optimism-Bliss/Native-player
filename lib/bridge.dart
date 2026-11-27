@@ -260,3 +260,73 @@ class SubtitleText {
 }
 
 String _clip(String s, int max) => s.length <= max ? s : '${s.substring(0, max)}…';
+
+/// One other version / source of the file being played (`{type:'alts'}` from the page).
+class AltOption {
+  const AltOption({required this.label, this.url, this.token, this.cached = true, this.library = false});
+  final String label;
+
+  /// Library version: played directly (`/s/<key>`).
+  final Uri? url;
+
+  /// Addon stream: the page turns it into a link (`/api/sources/select`).
+  final String? token;
+  final bool cached;
+  final bool library;
+
+  static AltOption? parse(Object? raw, {required bool library}) {
+    if (raw is! Map) return null;
+    final label = raw['label'];
+    if (label is! String || label.isEmpty) return null;
+    final url = raw['url'] is String ? Uri.tryParse(raw['url'] as String) : null;
+    final token = raw['token'] is String ? raw['token'] as String : null;
+    if (library && (url == null || !(url.isScheme('http') || url.isScheme('https')))) return null;
+    if (!library && (token == null || token.isEmpty || token.length > 4000)) return null;
+    return AltOption(label: _clip(label, 200), url: url, token: token, cached: raw['cached'] != false, library: library);
+  }
+}
+
+/// `{type:'alts', v:1, key, library:[{label,url}], streams:[{label,token,cached}], message}`.
+class Alternatives {
+  const Alternatives({required this.key, this.library = const [], this.streams = const [], this.message = ''});
+  final String key;
+  final List<AltOption> library;
+  final List<AltOption> streams;
+  final String message;
+
+  static Alternatives parse(Map raw) {
+    final key = raw['key'];
+    if (!isValidKey(key)) throw const FormatException('Khoá file không hợp lệ');
+    List<AltOption> list(Object? v, bool lib) =>
+        [if (v is List) ...v.take(40).map((x) => AltOption.parse(x, library: lib)).nonNulls];
+    final m = raw['message'];
+    return Alternatives(
+      key: key as String,
+      library: list(raw['library'], true),
+      streams: list(raw['streams'], false),
+      message: m is String ? _clip(m, 300) : '',
+    );
+  }
+}
+
+/// `{type:'altUrl', v:1, key, url, label, error}`: the link for an addon stream the player picked.
+class AltUrl {
+  const AltUrl({required this.key, this.url, this.label = '', this.error = ''});
+  final String key;
+  final Uri? url;
+  final String label;
+  final String error;
+
+  static AltUrl parse(Map raw) {
+    final key = raw['key'];
+    if (!isValidKey(key)) throw const FormatException('Khoá file không hợp lệ');
+    final u = raw['url'] is String ? Uri.tryParse(raw['url'] as String) : null;
+    final ok = u != null && (u.isScheme('http') || u.isScheme('https'));
+    return AltUrl(
+      key: key as String,
+      url: ok ? u : null,
+      label: raw['label'] is String ? _clip(raw['label'] as String, 200) : '',
+      error: raw['error'] is String ? _clip(raw['error'] as String, 300) : (ok ? '' : 'Không nhận được link'),
+    );
+  }
+}

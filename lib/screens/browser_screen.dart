@@ -654,7 +654,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
     try {
       // the page answers the player that asked: the TV's while it plays there
       final tv = _tvSession;
-      if (!_playerOpen && tv != null && tv.running && (type == 'subs' || type == 'subText' || type == 'subSearch')) {
+      if (!_playerOpen && tv != null && tv.running && (type == 'subs' || type == 'subText' || type == 'subSearch' || type == 'alts' || type == 'altUrl')) {
         tv.client.page(raw!).catchError((Object e) => appLog('tv page relay: $e'));
         return {'ok': true};
       }
@@ -685,6 +685,12 @@ class _BrowserScreenState extends State<BrowserScreen> {
           return {'ok': true};
         case 'subSearch':
           _toPlayer.add(SubtitleSearch.parse(raw as Map));
+          return {'ok': true};
+        case 'alts':
+          _toPlayer.add(Alternatives.parse(raw as Map));
+          return {'ok': true};
+        case 'altUrl':
+          _toPlayer.add(AltUrl.parse(raw as Map));
           return {'ok': true};
       }
       final request = PlayRequest.parse(raw, widget.server);
