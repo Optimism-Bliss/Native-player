@@ -845,7 +845,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             valueListenable: c.error,
             builder: (context, err, _) => err == null
                 ? const SizedBox.shrink()
-                : _ErrorPanel(message: err, onRetry: c.retry, onClose: _close, onNext: c.hasNext ? c.next : null),
+                : _ErrorPanel(message: err, onRetry: c.retry, onClose: _close, onNext: c.hasNext ? c.next : null, onSwitch: _pickAlternative),
           ),
         ],
       ),
@@ -1389,7 +1389,10 @@ class _VolumeSlider extends StatelessWidget {
 }
 
 class _ErrorPanel extends StatelessWidget {
-  const _ErrorPanel({required this.message, required this.onClose, this.onRetry, this.onNext});
+  const _ErrorPanel({required this.message, required this.onClose, this.onRetry, this.onNext, this.onSwitch});
+
+  /// Nguồn này hỏng: mở danh sách bản khác / nguồn khác của đúng phim / tập.
+  final VoidCallback? onSwitch;
   final String message;
   final VoidCallback onClose;
   final VoidCallback? onRetry;
@@ -1422,6 +1425,12 @@ class _ErrorPanel extends StatelessWidget {
                           onPressed: onRetry,
                           icon: const Icon(IconsaxPlusLinear.refresh),
                           label: const Text('Thử lại'),
+                        ),
+                      if (onSwitch != null)
+                        FilledButton.icon(
+                          onPressed: onSwitch,
+                          icon: const Icon(IconsaxPlusLinear.arrow_swap_horizontal),
+                          label: const Text('Đổi bản / nguồn'),
                         ),
                       if (onNext != null)
                         FilledButton.tonalIcon(

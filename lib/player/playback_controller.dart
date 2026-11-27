@@ -358,7 +358,9 @@ class PlaybackController {
   }
 
   Future<void> _switchTo(Uri url, String label) async {
-    final pos = player.state.position;
+    // sau lỗi phát, player có thể đã về 0: dùng vị trí cuối cùng còn biết
+    final now = player.state.position;
+    final pos = now > Duration.zero ? now : _lastPosition;
     _urlOverride[current.key] = url;
     appLog('play: switch source -> $label at ${pos.inSeconds}s');
     _say('Chuyển sang: $label');
