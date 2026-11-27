@@ -130,7 +130,12 @@ class PlayerHost {
       try {
         final cacheDir = Directory('${(await getTemporaryDirectory()).path}${Platform.pathSeparator}mpv-cache');
         await cacheDir.create(recursive: true);
-        await native.setProperty('cache-dir', cacheDir.path);
+        // mpv 0.39+: demuxer-cache-dir (cache-dir is the old, deprecated name)
+        try {
+          await native.setProperty('demuxer-cache-dir', cacheDir.path);
+        } catch (_) {
+          await native.setProperty('cache-dir', cacheDir.path);
+        }
       } catch (e) {
         appLog('player: cache dir: $e');
       }
