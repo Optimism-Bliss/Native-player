@@ -305,6 +305,7 @@ class PlaybackController {
           if (!playing) reportProgress();
         }),
       )
+      ..add(player.stream.duration.listen(_checkPlaceholder))
       ..add(player.stream.buffering.listen(_onBuffering))
       ..add(player.stream.error.listen(_onError))
       ..add(
@@ -321,6 +322,19 @@ class PlaybackController {
     index.value = request.index;
     _initialized = true;
     await _open(start: request.start);
+  }
+
+  /// Nguồn addon trả video báo lỗi ngắn (StremThru "No Matching File", ~30 giây) khi gói không có đúng tập: coi là lỗi
+  /// để màn lỗi hiện nút Đổi bản / nguồn. Chỉ áp cho bản phát từ addon (link không phải /s/ của server).
+  void _checkPlaceholder(Duration d) {
+    if (_disposed || d <= Duration.zero || d >= const Duration(seconds: 60)) return;
+    final key = current.key;
+    // bản phát từ addon: không phải link /s/ của server (file trong thư viện) — kể cả bản đổi sang trong trình phát
+    final url = _urlOverride[key] ?? current.url;
+    if (url.path.contains('/s/')) return;
+    appLog('play: addon video only ${d.inSeconds}s — treated as "no matching file"');
+    unawaited(player.pause());
+    error.value = 'Nguồn này không có đúng file phim (addon chỉ trả video báo lỗi ${d.inSeconds} giây). Bấm "Đổi bản / nguồn" để chọn bản khác.';
   }
 
   /// Another version / source picked in the player for a file (key → url); the file keeps its key, so progress and
