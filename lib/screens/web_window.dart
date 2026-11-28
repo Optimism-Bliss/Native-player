@@ -70,7 +70,7 @@ class WebWindow {
   dw.addEventListener('torboxEvent', (e) => {
     if (window.TorBoxStrmBridge) window.TorBoxStrmBridge.event(e);
   });
-  Object.defineProperty(window, 'TorBoxStrmApp', {value: Object.freeze({v: $bridgeVersion, platform: ${jsonEncode(Platform.operatingSystem)}, dl: 1, screen: ${screenJs()}})});
+  Object.defineProperty(window, 'TorBoxStrmApp', {value: Object.freeze({v: $bridgeVersion, platform: ${jsonEncode(Platform.operatingSystem)}, dl: 1, files: 1, screen: ${screenJs()}})});
   Object.defineProperty(window, 'webviewAll', {value: Object.freeze({
     callHandler(name, msg) {
       const id = ++seq;

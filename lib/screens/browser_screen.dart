@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -478,7 +479,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
       await _web.tryAddUserScript(
         WebViewUserScript(
           source:
-              'window.TorBoxStrmApp=Object.freeze({v:$bridgeVersion,platform:${jsonEncode(_platform)},tv:$isTvDevice,dl:${isTvDevice ? 0 : 1},screen:${screenJs()}});',
+              'window.TorBoxStrmApp=Object.freeze({v:$bridgeVersion,platform:${jsonEncode(_platform)},tv:$isTvDevice,dl:${isTvDevice ? 0 : 1},files:${isTvDevice ? 0 : 1},screen:${screenJs()}});',
         ),
       );
     });
@@ -686,6 +687,14 @@ class _BrowserScreenState extends State<BrowserScreen> {
         unawaited(_addDownload(raw as Map));
         return {'ok': true};
       }
+      if (type == 'saveFile') {
+        unawaited(_saveFile(raw as Map));
+        return {'ok': true};
+      }
+      if (type == 'pickFile') {
+        unawaited(_pickFile(raw as Map));
+        return {'ok': true};
+      }
       switch (type) {
         case 'subs':
           _toPlayer.add(SubtitleList.parse(raw as Map));
@@ -881,6 +890,52 @@ class _BrowserScreenState extends State<BrowserScreen> {
       subLang: subLang.replaceAll(RegExp(r'[^A-Za-z-]'), ''),
     );
     unawaited(_sendEvent({'type': 'toast', 'text': msg}));
+  }
+
+  /// Trang muốn lưu một file (CSV xuất, phụ đề…): hộp "Lưu file" của hệ thống — WebView trong app không tải được
+  /// link `download` như trình duyệt.
+  Future<void> _saveFile(Map raw) async {
+    final name = (raw['name'] is String ? raw['name'] as String : 'file').replaceAll(RegExp(r'[\\/:*?"<>|\x00-\x1f]'), '_');
+    final mime = raw['mime'] is String ? raw['mime'] as String : 'application/octet-stream';
+    try {
+      final bytes = base64Decode(raw['b64'] is String ? raw['b64'] as String : '');
+      final uri = await FilePicker.saveFile(fileName: name, bytes: bytes, mimeType: mime, dialogTitle: 'Lưu file');
+      unawaited(_sendEvent({'type': 'toast', 'text': uri == null ? 'Đã huỷ lưu file' : 'Đã lưu $name'}));
+    } catch (e) {
+      appLog('saveFile: $e');
+      unawaited(_sendEvent({'type': 'toast', 'text': 'Không lưu được file: $e'}));
+    }
+  }
+
+  /// Trang muốn chọn một file (CSV nhập, phụ đề…): hộp chọn file của hệ thống, gửi nội dung lại cho trang.
+  Future<void> _pickFile(Map raw) async {
+    final id = raw['id'] is String ? raw['id'] as String : '';
+    final accept = raw['accept'] is List
+        ? (raw['accept'] as List).whereType<String>().map((e) => e.replaceAll('.', '').toLowerCase()).where((e) => RegExp(r'^[a-z0-9]{1,8}$').hasMatch(e)).toList()
+        : <String>[];
+    Map<String, Object?> reply = {'type': 'pickedFile', 'id': id};
+    try {
+      // FileType.any rồi tự kiểm tra đuôi: bộ lọc theo đuôi của Android hay làm mờ file .csv / .srt
+      final files = await FilePicker.pickFiles(dialogTitle: 'Chọn file');
+      if (files.isNotEmpty) {
+        final f = files.first;
+        final ext = f.name.contains('.') ? f.name.split('.').last.toLowerCase() : '';
+        if (accept.isNotEmpty && !accept.contains(ext)) {
+          unawaited(_sendEvent({'type': 'toast', 'text': 'Chọn file ${accept.map((e) => '.$e').join(', ')}'}));
+        } else {
+          final bytes = await f.readAsBytes();
+          if (bytes.length > 20 * 1024 * 1024) {
+            unawaited(_sendEvent({'type': 'toast', 'text': 'File lớn quá (tối đa 20 MB)'}));
+          } else {
+            reply = {...reply, 'name': f.name, 'b64': base64Encode(bytes)};
+          }
+        }
+      }
+    } catch (e) {
+      appLog('pickFile: $e');
+      unawaited(_sendEvent({'type': 'toast', 'text': 'Không mở được file: $e'}));
+    }
+    await _sendEvent(reply);
   }
 
   /// "Phim đã tải" (xem không cần mạng).
