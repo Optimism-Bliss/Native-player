@@ -12,6 +12,8 @@ import 'package:webview_all_android/webview_all_android.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../bridge.dart';
+import '../download/downloads.dart';
+import '../download/downloads_screen.dart';
 import '../player/playback_controller.dart';
 import '../player/player_screen.dart';
 import '../player/player_settings_screen.dart';
@@ -476,7 +478,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
       await _web.tryAddUserScript(
         WebViewUserScript(
           source:
-              'window.TorBoxStrmApp=Object.freeze({v:$bridgeVersion,platform:${jsonEncode(_platform)},tv:$isTvDevice,screen:${screenJs()}});',
+              'window.TorBoxStrmApp=Object.freeze({v:$bridgeVersion,platform:${jsonEncode(_platform)},tv:$isTvDevice,dl:${isTvDevice ? 0 : 1},screen:${screenJs()}});',
         ),
       );
     });
@@ -676,6 +678,14 @@ class _BrowserScreenState extends State<BrowserScreen> {
         _openMenuFromPage();
         return {'ok': true};
       }
+      if (type == 'downloads') {
+        unawaited(_openDownloads());
+        return {'ok': true};
+      }
+      if (type == 'download') {
+        unawaited(_addDownload(raw as Map));
+        return {'ok': true};
+      }
       switch (type) {
         case 'subs':
           _toPlayer.add(SubtitleList.parse(raw as Map));
@@ -839,6 +849,60 @@ class _BrowserScreenState extends State<BrowserScreen> {
     if (mounted) await _showAppMenu();
   }
 
+  /// Page asked to download a file (only accounts the admin allowed). The link must be on this server.
+  Future<void> _addDownload(Map raw) async {
+    String s(String k) => raw[k] is String ? raw[k] as String : '';
+    final key = s('key');
+    final url = Uri.tryParse(s('url'));
+    if (!isValidKey(key) || url == null || url.host != widget.server.host || !(url.scheme == 'https' || url.scheme == 'http')) {
+      appLog('download: refused ${s('url')}');
+      return;
+    }
+    Uri? subUrl;
+    final sub = raw['sub'];
+    String subLabel = '', subLang = '';
+    if (sub is Map && sub['url'] is String) {
+      final u = Uri.tryParse(sub['url'] as String);
+      if (u != null && u.host == widget.server.host) subUrl = u;
+      subLabel = sub['label'] is String ? sub['label'] as String : '';
+      subLang = sub['lang'] is String ? (sub['lang'] as String) : '';
+    }
+    final poster = Uri.tryParse(s('poster'));
+    final msg = await Downloads.instance.add(
+      id: key,
+      url: url,
+      title: s('title').isEmpty ? s('file_name') : s('title'),
+      fileName: s('file_name'),
+      size: raw['size'] is num ? (raw['size'] as num).toInt() : 0,
+      ext: s('ext'),
+      poster: poster != null && poster.scheme == 'https' ? poster.toString() : '',
+      subUrl: subUrl,
+      subLabel: subLabel,
+      subLang: subLang.replaceAll(RegExp(r'[^A-Za-z-]'), ''),
+    );
+    unawaited(_sendEvent({'type': 'toast', 'text': msg}));
+  }
+
+  /// "Phim đã tải" (xem không cần mạng).
+  Future<void> _openDownloads() async {
+    if (WebWindowNative.embedded) {
+      await _overPage(() => DownloadsScreen.open(context));
+      return;
+    }
+    if (_external) {
+      try {
+        await windowManager.show();
+        await windowManager.focus();
+      } catch (_) {}
+    }
+    if (mounted) await DownloadsScreen.open(context);
+    if (_external && !_playerOpen && (_window?.isOpen.value ?? false)) {
+      try {
+        await windowManager.hide();
+      } catch (_) {}
+    }
+  }
+
   /// "📱 Ứng dụng" in the page's account menu: phones have no toolbar, and
   /// in the Windows web window the app window is hidden.
   Future<void> _openMenuFromPage() async {
@@ -887,6 +951,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
                   ('server', IconsaxPlusLinear.global_edit, 'Đổi máy chủ'),
                   ('signout', IconsaxPlusLinear.logout, 'Đăng xuất'),
                   ('player-settings', IconsaxPlusLinear.setting_2, 'Cài đặt trình phát'),
+                  if (!isTvDevice) ('downloads', IconsaxPlusLinear.document_download, 'Phim đã tải (xem không cần mạng)'),
                   ('update', IconsaxPlusLinear.refresh_circle, 'Kiểm tra cập nhật'),
                   ('log', IconsaxPlusLinear.document_text, 'Nhật ký'),
                   if (QrScanScreen.available && !isTvDevice)
@@ -914,6 +979,8 @@ class _BrowserScreenState extends State<BrowserScreen> {
         if (mounted) await checkForUpdate(context);
       case 'player-settings':
         if (mounted) await PlayerSettingsScreen.open(context);
+      case 'downloads':
+        if (mounted) await DownloadsScreen.open(context);
       case 'log':
         await _showLog();
       case 'role':
@@ -1052,6 +1119,12 @@ class _BrowserScreenState extends State<BrowserScreen> {
                                       label: const Text('Thử lại'),
                                     ),
                                     OutlinedButton(onPressed: _changeServer, child: const Text('Đổi máy chủ')),
+                                    if (!isTvDevice)
+                                      OutlinedButton.icon(
+                                        onPressed: () => DownloadsScreen.open(context),
+                                        icon: const Icon(IconsaxPlusLinear.document_download),
+                                        label: const Text('Phim đã tải'),
+                                      ),
                                     if (isDesktop) TextButton(onPressed: _showLog, child: const Text('Nhật ký')),
                                   ],
                                 ),
