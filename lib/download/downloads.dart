@@ -1,14 +1,18 @@
 // Phim tải về máy để xem không cần mạng.
 //
-// Trang web (chỉ tài khoản được admin cho phép "Tải về") gửi lệnh `download` với link /s của file trên máy chủ; app
-// tải từng file một vào thư mục riêng của app, tải tiếp được khi bị ngắt (HTTP Range), lưu danh sách + vị trí xem dở
-// vào `index.json`. Phát bằng trình phát của app như phim online, kể cả khi không có mạng.
+// Trang web (chỉ tài khoản được admin cho phép "Tải về") gửi lệnh `download` với link /s của file trên máy chủ.
+// - Android: giao cho DownloadManager của hệ thống (SystemDownloads.kt) — tải chạy nền kể cả khi app đã tắt, tự tải
+//   tiếp khi có mạng lại, tiến độ trên thanh thông báo; app chỉ hỏi trạng thái để hiện danh sách.
+// - Windows / máy khác: app tự tải từng file một (HTTP Range — tải tiếp được khi bị ngắt), chạy khi app còn mở
+//   (thu nhỏ cửa sổ vẫn tải).
+// Danh sách + vị trí xem dở lưu ở `index.json`. Phát bằng trình phát của app, kể cả khi không có mạng.
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../util/log.dart';
@@ -22,6 +26,7 @@ class DownloadItem {
     required this.fileName,
     required this.url,
     required this.path,
+    this.nativeId = 0,
     this.size = 0,
     this.poster = '',
     this.subUrl = '',
@@ -41,7 +46,10 @@ class DownloadItem {
   final String title;
   final String fileName;
   final String url;
-  final String path;
+  String path;
+
+  /// id trong DownloadManager (Android), 0 = app tự tải
+  int nativeId;
   int size;
   final String poster;
   final String subUrl;
@@ -63,6 +71,7 @@ class DownloadItem {
     'fileName': fileName,
     'url': url,
     'path': path,
+    'nativeId': nativeId,
     'size': size,
     'poster': poster,
     'subUrl': subUrl,
@@ -88,6 +97,7 @@ class DownloadItem {
       fileName: s('fileName'),
       url: s('url'),
       path: s('path'),
+      nativeId: n('nativeId'),
       size: n('size'),
       poster: s('poster'),
       subUrl: s('subUrl'),
@@ -108,6 +118,11 @@ class DownloadItem {
 class Downloads extends ChangeNotifier {
   Downloads._();
   static final Downloads instance = Downloads._();
+
+  /// Android: DownloadManager của hệ thống tải (chạy nền, không tạm dừng được — chỉ huỷ)
+  static bool get native => Platform.isAndroid;
+  static const _ch = MethodChannel('torboxstrm/downloads');
+  Timer? _poll;
 
   final List<DownloadItem> items = [];
   Directory? _dir;
@@ -139,8 +154,10 @@ class Downloads extends ChangeNotifier {
           for (final j in raw) {
             final it = DownloadItem.fromJson(j);
             if (it == null) continue;
-            // app tắt giữa chừng: chờ người dùng bấm tải tiếp
-            if (it.state == DownloadState.downloading || it.state == DownloadState.queued) it.state = DownloadState.paused;
+            // app tự tải mà bị tắt giữa chừng: chờ người dùng bấm tải tiếp (DownloadManager thì vẫn đang tải nền)
+            if (it.nativeId == 0 && (it.state == DownloadState.downloading || it.state == DownloadState.queued)) {
+              it.state = DownloadState.paused;
+            }
             items.add(it);
           }
         }
@@ -149,6 +166,103 @@ class Downloads extends ChangeNotifier {
       appLog('downloads: load: $e');
     }
     notifyListeners();
+    _watch();
+  }
+
+  // ---------------------------------------------------------------- Android: DownloadManager
+
+  Future<void> _enqueueNative(DownloadItem it) async {
+    try {
+      final r = await _ch.invokeMapMethod<String, Object?>('enqueue', {'url': it.url, 'title': it.title, 'fileName': _fileName(it)});
+      it.nativeId = (r?['id'] as num?)?.toInt() ?? 0;
+      final p = r?['path'];
+      if (p is String && p.isNotEmpty) it.path = p;
+      it.state = it.nativeId > 0 ? DownloadState.downloading : DownloadState.error;
+      it.error = it.nativeId > 0 ? '' : 'Android không nhận lệnh tải';
+    } catch (e) {
+      it.state = DownloadState.error;
+      it.error = 'Android không nhận lệnh tải: $e';
+    }
+    notifyListeners();
+    await _save();
+    _watch();
+  }
+
+  String _fileName(DownloadItem it) {
+    final dot = it.path.lastIndexOf('.');
+    final ext = dot > 0 ? it.path.substring(dot + 1) : 'mkv';
+    return '${_safe(it.title.isNotEmpty ? it.title : it.fileName)}.$ext';
+  }
+
+  /// Hỏi DownloadManager tiến độ (1,5 giây một lần khi còn file đang tải).
+  void _watch() {
+    if (!native || _poll != null) return;
+    if (!items.any((it) => it.nativeId > 0 && it.state == DownloadState.downloading)) return;
+    _poll = Timer.periodic(const Duration(milliseconds: 1500), (_) => unawaited(_pollNative()));
+  }
+
+  Future<void> _pollNative() async {
+    final active = items.where((it) => it.nativeId > 0 && it.state == DownloadState.downloading).toList();
+    if (active.isEmpty) {
+      _poll?.cancel();
+      _poll = null;
+      return;
+    }
+    List<Object?> rows;
+    try {
+      rows = await _ch.invokeListMethod<Object?>('query', {'ids': active.map((e) => e.nativeId).toList()}) ?? const [];
+    } catch (e) {
+      appLog('downloads: query: $e');
+      return;
+    }
+    var changed = false;
+    for (final it in active) {
+      Map? row;
+      for (final r in rows) {
+        if (r is Map && (r['id'] as num?)?.toInt() == it.nativeId) row = r;
+      }
+      if (row == null) {
+        // người dùng huỷ trong thanh thông báo / hệ thống xoá
+        it.state = DownloadState.error;
+        it.error = 'Đã bị huỷ — bấm tải lại';
+        changed = true;
+        continue;
+      }
+      final done = (row['done'] as num?)?.toInt() ?? 0;
+      final total = (row['total'] as num?)?.toInt() ?? 0;
+      if (total > 0) it.size = total;
+      it.received = done;
+      switch (row['status']) {
+        case 'done':
+          it.state = DownloadState.done;
+          it.received = it.size = total > 0 ? total : await File(it.path).length().catchError((_) => done);
+          it.error = '';
+          unawaited(_subAfterNative(it));
+        case 'failed':
+          it.state = DownloadState.error;
+          it.error = 'Tải lỗi (mã ${row['reason']}) — bấm tải lại';
+        case 'paused':
+          // chờ mạng / chờ Wi-Fi: DownloadManager tự tải tiếp
+          it.error = 'Đang chờ mạng…';
+        default:
+          it.error = '';
+      }
+      changed = true;
+    }
+    if (changed) {
+      notifyListeners();
+      _saveSoon();
+    }
+  }
+
+  Future<void> _subAfterNative(DownloadItem it) async {
+    final c = HttpClient()..connectionTimeout = const Duration(seconds: 20);
+    try {
+      await _fetchSub(c, it);
+      await _save();
+    } finally {
+      c.close(force: true);
+    }
   }
 
   Future<void> _save() async {
@@ -199,10 +313,8 @@ class Downloads extends ChangeNotifier {
     final have = byId(id);
     if (have != null) {
       if (have.state == DownloadState.done) return 'Phim này đã tải về máy';
-      have.state = DownloadState.queued;
-      have.error = '';
-      notifyListeners();
-      unawaited(_pump());
+      if (have.state == DownloadState.downloading) return 'Phim này đang tải';
+      resume(have);
       return 'Đang tải tiếp';
     }
     final d = await _folder();
@@ -229,6 +341,10 @@ class Downloads extends ChangeNotifier {
     );
     notifyListeners();
     await _save();
+    if (native) {
+      await _enqueueNative(items.first);
+      return items.first.state == DownloadState.error ? items.first.error : 'Đang tải nền — xem tiến độ trên thanh thông báo';
+    }
     unawaited(_pump());
     return 'Đã thêm vào danh sách tải';
   }
@@ -365,6 +481,15 @@ class Downloads extends ChangeNotifier {
 
   void resume(DownloadItem it) {
     if (it.state == DownloadState.done || it.state == DownloadState.downloading) return;
+    if (native) {
+      // DownloadManager không tải tiếp bản đã huỷ / lỗi: tải lại từ đầu
+      final old = it.nativeId;
+      if (old > 0) unawaited(_ch.invokeMethod<int>('remove', {'ids': [old]}).catchError((_) => 0));
+      it.nativeId = 0;
+      it.received = 0;
+      unawaited(_enqueueNative(it));
+      return;
+    }
     it.state = DownloadState.queued;
     it.error = '';
     notifyListeners();
@@ -372,6 +497,14 @@ class Downloads extends ChangeNotifier {
   }
 
   Future<void> remove(DownloadItem it) async {
+    if (it.nativeId > 0) {
+      // DownloadManager huỷ và xoá file của nó
+      try {
+        await _ch.invokeMethod<int>('remove', {'ids': [it.nativeId]});
+      } catch (e) {
+        appLog('downloads: remove: $e');
+      }
+    }
     if (identical(_active, it)) {
       _stop = true;
       _client?.close(force: true);

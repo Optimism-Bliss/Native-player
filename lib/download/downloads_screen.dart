@@ -100,7 +100,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                 child: Text(
-                  '${_dl.items.length} phim · dùng ${_size(_dl.usedBytes)} trên máy · xem được khi không có mạng',
+                  '${_dl.items.length} phim · dùng ${_size(_dl.usedBytes)} trên máy · xem được khi không có mạng'
+                  '${Downloads.native ? ' · tải chạy nền, kể cả khi đã tắt app' : ' · tải khi app còn mở (thu nhỏ cửa sổ vẫn tải)'}',
                   style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
                 ),
               ),
@@ -117,7 +118,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     final watched = it.durationMs > 0 ? (it.positionMs / it.durationMs).clamp(0.0, 1.0) : 0.0;
     final status = switch (it.state) {
       DownloadState.done => '${_size(it.size)}${watched > 0.02 ? ' · đã xem ${(watched * 100).round()}%' : ''}',
-      DownloadState.downloading => 'Đang tải ${_size(it.received)} / ${_size(it.size)} · ${(it.progress * 100).toStringAsFixed(0)}%',
+      DownloadState.downloading =>
+        'Đang tải ${_size(it.received)} / ${_size(it.size)} · ${(it.progress * 100).toStringAsFixed(0)}%${it.error.isNotEmpty ? ' · ${it.error}' : ''}',
       DownloadState.queued => 'Chờ tải · ${_size(it.size)}',
       DownloadState.paused => 'Tạm dừng ${_size(it.received)} / ${_size(it.size)}',
       DownloadState.error => 'Lỗi: ${it.error}',
@@ -136,7 +138,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (it.state == DownloadState.downloading || it.state == DownloadState.queued)
+          // Android tải bằng hệ thống (chạy nền): không tạm dừng được, chỉ huỷ (nút xoá)
+          if (!Downloads.native && (it.state == DownloadState.downloading || it.state == DownloadState.queued))
             IconButton(tooltip: 'Tạm dừng', icon: const Icon(IconsaxPlusLinear.pause), onPressed: () => _dl.pause(it)),
           if (it.state == DownloadState.paused || it.state == DownloadState.error)
             IconButton(tooltip: 'Tải tiếp', icon: const Icon(IconsaxPlusLinear.import), onPressed: () => _dl.resume(it)),

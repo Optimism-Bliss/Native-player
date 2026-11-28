@@ -73,6 +73,10 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+        // "Tải về máy": DownloadManager của hệ thống (tải nền, kể cả khi app đã tắt) — SystemDownloads.kt
+        val downloads = SystemDownloads(applicationContext)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "torboxstrm/downloads")
+            .setMethodCallHandler { call, result -> downloads.handle(call, result) }
         // Android TV: Media3 player under the transparent Flutter surface (Media3Host.kt).
         val media3Channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "torboxstrm/media3")
         val host = Media3Host(this, media3Channel)
